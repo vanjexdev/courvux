@@ -1,0 +1,22 @@
+{
+    "name": "courvux",
+    "author": "Vanjexdex",
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "dev:ts": "tsc -w",
+        "dev:server": "node devserver.js",
+        "dev": "concurrently \"npm run dev:ts\" \"npm run dev:server\"",
+        "build": "vite build && esbuild dist/index.js --bundle=false --minify --allow-overwrite --outfile=dist/index.js",
+        "build:types": "tsc -p tsconfig.types.json",
+        "build:all": "npm run build && npm run build:types"
+    },
+    "devDependencies": {
+        "@rollup/plugin-terser": "^1.0.0",
+        "concurrently": "^8.2.0",
+        "esbuild": "^0.28.0",
+        "serve": "^14.2.0",
+        "typescript": "^5.0.0",
+        "vite": "^8.0.10"
+    }
+}
