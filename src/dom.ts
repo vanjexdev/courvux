@@ -40,9 +40,8 @@ const safeEval = (expr: string, state: any): any => {
 export const evaluate = (expr: string, state: any): any => {
     if (!evalSupported) return safeEval(expr, state);
     try {
-        const keys = Object.keys(state);
-        const fn = new Function(...keys, `return (${expr})`);
-        return fn(...keys.map(k => state[k]));
+        const fn = new Function('$data', `with($data) { return (${expr}) }`);
+        return fn(state);
     } catch {
         return resolve(expr, state);
     }

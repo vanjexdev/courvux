@@ -2,7 +2,7 @@
 
 Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM updates via Proxy-based reactivity. Ships as a single minified ES module (~10 kB gzip), no build step required.
 
-**Author:** Vanjex — **Version:** 0.1.5
+**Author:** Vanjex — **Version:** 0.1.6
 
 ---
 
