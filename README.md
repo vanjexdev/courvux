@@ -2,7 +2,7 @@
 
 Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM updates via Proxy-based reactivity. Ships as a single minified ES module (~10 kB gzip), no build step required.
 
-**Author:** Vanjex — **Version:** 0.1.1
+**Author:** Vanjex — **Version:** 0.1.4
 
 ---
 
@@ -67,6 +67,10 @@ Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM
 - [Batch Updates — $batch](#batch-updates--batch)
 - [Error Boundaries — onError](#error-boundaries--onerror)
 - [Plugin System](#plugin-system)
+- [Progressive Web App (PWA)](#progressive-web-app-pwa)
+  - [Web App Manifest](#web-app-manifest)
+  - [Service Worker with Workbox](#service-worker-with-workbox)
+  - [PWA install prompt utility](#pwa-install-prompt-utility)
 - [Building](#building)
 - [Development](#development)
 - [Known Limitations](#known-limitations)
@@ -1422,6 +1426,190 @@ createApp({
 <i data-lucide="home"></i>
 <i data-lucide="star"></i>
 ```
+
+---
+
+## Progressive Web App (PWA)
+
+Courvux does not bundle PWA tooling — the manifest and service worker strategy are always app-specific. This section covers the minimal setup to make any Courvux app installable and offline-capable, plus an optional utility for reacting to install and connectivity events in your components.
+
+---
+
+### Web App Manifest
+
+Create `public/manifest.json`:
+
+```json
+{
+  "name": "My App",
+  "short_name": "MyApp",
+  "description": "A Courvux application",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#3b82f6",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
+```
+
+Link it in `index.html`:
+
+```html
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#3b82f6" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+```
+
+---
+
+### Service Worker with Workbox
+
+Install the Vite plugin:
+
+```bash
+npm install -D vite-plugin-pwa
+```
+
+Configure in `vite.config.ts`:
+
+```ts
+import { defineConfig } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
+
+export default defineConfig({
+  plugins: [
+    VitePWA({
+      registerType: 'autoUpdate',
+      manifest: false, // use your own public/manifest.json
+      workbox: {
+        // cache the app shell and all static assets
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // runtime caching for API calls
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/api\.yourapp\.com\//,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 },
+            },
+          },
+        ],
+      },
+    }),
+  ],
+});
+```
+
+**Cache strategies at a glance:**
+
+| Strategy | Best for |
+|---|---|
+| `CacheFirst` | Static assets (fonts, images, icons) |
+| `NetworkFirst` | API calls — fresh data when online, fallback when offline |
+| `StaleWhileRevalidate` | Non-critical data — instant from cache, updates in background |
+
+---
+
+### PWA install prompt utility
+
+The browser fires `beforeinstallprompt` when the app is installable, but only once. Capture it early — before any user interaction — and surface it at the right moment.
+
+Create `src/pwa.ts`:
+
+```ts
+interface PWAState {
+  installable: boolean;
+  installed: boolean;
+  online: boolean;
+  prompt: (() => Promise<void>) | null;
+}
+
+export function createPWA(): PWAState {
+  const state: PWAState = {
+    installable: false,
+    installed: window.matchMedia('(display-mode: standalone)').matches,
+    online: navigator.onLine,
+    prompt: null,
+  };
+
+  let deferredPrompt: any = null;
+
+  window.addEventListener('beforeinstallprompt', (e: any) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    state.installable = true;
+    state.prompt = async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        state.installed = true;
+        state.installable = false;
+      }
+      deferredPrompt = null;
+      state.prompt = null;
+    };
+  });
+
+  window.addEventListener('appinstalled', () => {
+    state.installed = true;
+    state.installable = false;
+    deferredPrompt = null;
+  });
+
+  window.addEventListener('online',  () => { state.online = true; });
+  window.addEventListener('offline', () => { state.online = false; });
+
+  return state;
+}
+```
+
+Use it in your app:
+
+```ts
+import { createApp } from 'courvux';
+import { createPWA } from './pwa';
+
+const pwa = createPWA();
+
+createApp({
+  data: { pwa },
+  template: `<router-view></router-view>`,
+  // ...
+}).mount('#app');
+```
+
+Then in any template:
+
+```html
+<!-- offline banner -->
+<div cv-if="!pwa.online" class="offline-banner">
+  Sin conexión — usando datos en caché
+</div>
+
+<!-- install button -->
+<button cv-if="pwa.installable && !pwa.installed" @click="pwa.prompt()">
+  Instalar aplicación
+</button>
+```
+
+**What `createPWA` does and does not do:**
+
+| Does | Does not |
+|---|---|
+| Captures `beforeinstallprompt` before it expires | Register or manage the service worker |
+| Exposes a `prompt()` function to trigger the install dialog | Handle cache versioning or update notifications |
+| Tracks `online` / `offline` state reactively | Decide cache strategies — that belongs in `vite.config.ts` |
+| Detects if already running in standalone mode | Polyfill Safari's lack of `beforeinstallprompt` |
+
+> **Safari / iOS:** The install prompt API is not supported. Users must add to home screen manually via the share button. You can detect iOS and show a custom instruction with `navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')`.
 
 ---
 
