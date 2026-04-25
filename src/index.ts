@@ -191,9 +191,10 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
             Array.from(originalEl.attributes).forEach(attr => {
                 if (attr.name.startsWith(':')) {
                     props[attr.name.slice(1)] = evaluate(attr.value, parentState);
-                } else if (attr.name.startsWith('@')) {
+                } else if (attr.name.startsWith('@') || attr.name.startsWith('cv:on:')) {
                     const handlerName = attr.value;
-                    emitHandlers[attr.name.slice(1)] = (...args: any[]) => {
+                    const eventName = attr.name.startsWith('@') ? attr.name.slice(1) : attr.name.slice(6);
+                    emitHandlers[eventName] = (...args: any[]) => {
                         if (typeof parentState[handlerName] === 'function') parentState[handlerName].call(parentState, ...args);
                     };
                 }
@@ -281,7 +282,7 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
         const $attrs: Record<string, string> = {};
         Array.from(el.attributes).forEach(attr => {
             const isBinding = attr.name.startsWith(':');
-            const isEvent = attr.name.startsWith('@');
+            const isEvent = attr.name.startsWith('@') || attr.name.startsWith('cv:on:');
             const isCvModel = attr.name === 'cv-model' || attr.name.startsWith('cv-model.') || attr.name.startsWith('cv-model:');
             const isVSlot = attr.name.startsWith('v-slot');
             const isSlot = attr.name === 'slot';
@@ -299,8 +300,8 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
                 const expr = attr.value;
                 props[propName] = evaluate(expr, parentState);
                 propBindings.push({ propName, expr });
-            } else if (attr.name.startsWith('@')) {
-                const eventName = attr.name.slice(1);
+            } else if (attr.name.startsWith('@') || attr.name.startsWith('cv:on:')) {
+                const eventName = attr.name.startsWith('@') ? attr.name.slice(1) : attr.name.slice(6);
                 const handlerName = attr.value;
                 emitHandlers[eventName] = (...args: any[]) => {
                     if (typeof parentState[handlerName] === 'function') {

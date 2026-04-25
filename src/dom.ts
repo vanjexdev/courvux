@@ -647,8 +647,9 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight'
         };
         Array.from(element.attributes).forEach(attr => {
-            if (attr.name.startsWith('@')) {
-                const parts = attr.name.substring(1).split('.');
+            if (attr.name.startsWith('@') || attr.name.startsWith('cv:on:')) {
+                const raw = attr.name.startsWith('@') ? attr.name.substring(1) : attr.name.substring(6);
+                const parts = raw.split('.');
                 const baseEvent = parts[0];
                 const modifiers = new Set(parts.slice(1));
                 const keyFilter = [...modifiers].find(m => m in KEY_MAP);

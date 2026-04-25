@@ -2,7 +2,7 @@
 
 Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM updates via Proxy-based reactivity. Ships as a single minified ES module (~10 kB gzip), no build step required.
 
-**Author:** Vanjex — **Version:** 0.1.4
+**Author:** Vanjex — **Version:** 0.1.5
 
 ---
 
@@ -13,7 +13,7 @@ Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM
 - [createApp](#createapp)
 - [Template Syntax](#template-syntax)
   - [Interpolation](#interpolation)
-  - [Event binding — @event](#event-binding--event)
+  - [Event binding — cv:on:event](#event-binding--cvonevent)
   - [Property binding — :prop](#property-binding--prop)
   - [Class binding — :class](#class-binding--class)
   - [Style binding — :style](#style-binding--style)
@@ -193,53 +193,63 @@ app.use(plugin).directive('name', def).mount('#app');
 
 Full JavaScript expressions are supported (requires no strict CSP — see [Known Limitations](#known-limitations)).
 
-### Event binding — `@event`
+### Event binding — `cv:on:event`
 
 ```html
-<button @click="increment">+1</button>
-<input @input="handleInput" />
-<form @submit="onSubmit"></form>
+<button cv:on:click="increment">+1</button>
+<input cv:on:input="handleInput" />
+<form cv:on:submit="onSubmit"></form>
 ```
+
+The `cv:on:` prefix is the native Courvux syntax. The shorthand `@event` is also accepted and behaves identically — both can be used interchangeably.
 
 **Inline expressions** — no method needed:
 
 ```html
-<button @click="count++">+</button>
-<button @click="count = 0">Reset</button>
-<button @click="items.push('new')">Add</button>
+<button cv:on:click="count++">+</button>
+<button cv:on:click="count = 0">Reset</button>
+<button cv:on:click="items.push('new')">Add</button>
+```
+
+**`$event`** — access the raw DOM event:
+
+```html
+<input cv:on:input="search = $event.target.value" />
+<button cv:on:click="doThing($event)">Click</button>
+```
+
+**Custom parameters**:
+
+```html
+<button cv:on:click="deleteItem(item.id)">Delete</button>
+<button cv:on:click="doThing(item, $event)">Action</button>
 ```
 
 **Event modifiers** — chain with `.`:
 
 ```html
-<form @submit.prevent="onSubmit">...</form>
-<button @click.stop="doThing">...</button>
-<button @click.once="runOnce">...</button>
-<div @click.self="onSelf">...</div>
+<form cv:on:submit.prevent="onSubmit">...</form>
+<button cv:on:click.stop="doThing">...</button>
+<button cv:on:click.once="runOnce">...</button>
+<div cv:on:click.self="onSelf">...</div>
 ```
 
 **Listener options** (passive / capture):
 
 ```html
-<div @scroll.passive="onScroll">...</div>
-<div @click.capture="onCapture">...</div>
+<div cv:on:scroll.passive="onScroll">...</div>
+<div cv:on:click.capture="onCapture">...</div>
 ```
 
 **Key modifiers**:
 
 ```html
-<input @keydown.enter="submit" />
-<input @keydown.esc="cancel" />
-<input @keydown.tab="nextField" />
+<input cv:on:keydown.enter="submit" />
+<input cv:on:keydown.esc="cancel" />
+<input cv:on:keydown.tab="nextField" />
 ```
 
 Available key modifiers: `enter`, `esc` / `escape`, `space`, `tab`, `delete`, `backspace`, `up`, `down`, `left`, `right`.
-
-**`$event`** — access the raw DOM event inside inline expressions:
-
-```html
-<input @input="search = $event.target.value" />
-```
 
 ### Property binding — `:prop`
 
