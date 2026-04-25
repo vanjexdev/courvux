@@ -1,5 +1,5 @@
 import { AppConfig, ComponentConfig, RouteMatch, Router, WatcherOptions, DirectiveDef, DirectiveShorthand, ComputedDef } from './types.js';
-import { createReactivityScope, batchUpdate } from './reactivity.js';
+import { createReactivityScope, batchUpdate, collectDeps } from './reactivity.js';
 import { walk, WalkContext, evaluate, subscribeExpr, subscribeDeps, setStateValue } from './dom.js';
 import { setupRouterView, RouteActivation } from './router.js';
 
@@ -98,20 +98,33 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
     // $nextTick — espera el siguiente tick del microtask queue
     (state as any).$nextTick = (cb?: () => void): Promise<void> => nextTick(cb);
 
-    // Computed — re-evalúan cuando cambian sus dependencias; soporta { get, set? }
+    // Computed — auto-tracks deps via _activeEffect; soporta { get, set? }
+    const computedCleanups: Array<() => void> = [];
     if (config.computed) {
         Object.entries(config.computed).forEach(([key, def]: [string, ComputedDef]) => {
             const getter = typeof def === 'function' ? def : def.get;
             const setter = typeof def !== 'function' ? def.set : undefined;
-            const compute = () => { (state as any)[key] = getter.call(state); };
-            const deps = [...getter.toString().matchAll(/this\.(\w+)/g)].map(m => m[1]);
-            [...new Set(deps)].forEach(dep => subscribe(dep, compute));
+            let unsubs: Array<() => void> = [];
+            const compute = () => {
+                unsubs.forEach(u => u());
+                unsubs = [];
+                const rawDeps = collectDeps(() => { (state as any)[key] = getter.call(state); });
+                const seen = new Map<Function, Set<string>>();
+                for (const { sub, key: k } of rawDeps) {
+                    if (!seen.has(sub)) seen.set(sub, new Set());
+                    if (seen.get(sub)!.has(k)) continue;
+                    seen.get(sub)!.add(k);
+                    unsubs.push(sub(k, compute));
+                }
+            };
             compute();
+            computedCleanups.push(() => unsubs.forEach(u => u()));
             if (setter) registerSetInterceptor(key, (val: any) => setter.call(state, val));
         });
     }
 
     // Watchers — soporta función directa o { handler, immediate?, deep? }
+    const watcherUnsubs: Array<() => void> = [];
     if (config.watch) {
         Object.entries(config.watch).forEach(([key, watcherDef]) => {
             const isOptions = typeof watcherDef === 'object' && watcherDef !== null && 'handler' in watcherDef;
@@ -120,11 +133,12 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
             const deep = isOptions ? ((watcherDef as WatcherOptions).deep ?? false) : false;
 
             let oldVal = deep ? tryClone((state as any)[key]) : (state as any)[key];
-            subscribe(key, () => {
+            const unsub = subscribe(key, () => {
                 const newVal = (state as any)[key];
                 handler.call(state, newVal, oldVal);
                 oldVal = deep ? tryClone(newVal) : newVal;
             });
+            watcherUnsubs.push(unsub);
             if (immediate) {
                 handler.call(state, (state as any)[key], undefined);
             }
@@ -225,7 +239,13 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
 
     return {
         state,
-        destroy: () => { config.onBeforeUnmount?.call(state); cleanups.forEach(c => c()); config.onDestroy?.call(state); },
+        destroy: () => {
+            config.onBeforeUnmount?.call(state);
+            computedCleanups.forEach(c => c());
+            watcherUnsubs.forEach(u => u());
+            cleanups.forEach(c => c());
+            config.onDestroy?.call(state);
+        },
         activate: () => { config.onActivated?.call(state); },
         deactivate: () => { config.onDeactivated?.call(state); },
     };

@@ -1462,6 +1462,5 @@ The dev server (`devserver.js`) serves:
 | Item | Description |
 |---|---|
 | CSP / `new Function` | Expression evaluation and inline event handlers use `new Function`. Falls back to a safe evaluator (property access + literals only) under strict CSP — complex JS expressions in templates won't work. |
-| `cv-for` deep reactivity | Subscriptions track root keys only. Mutating a nested property inside an array item (`items[0].name = 'x'`) won't trigger a cv-for re-render — reassign the root array instead: `this.items = [...this.items]`. |
-| Computed dependencies | Dependencies are detected by parsing `this.key` in the getter source string. Dynamic key access (`this[dynamic]`) won't be tracked. |
+| `cv-for` re-render cost | Any change to a tracked array/object triggers a full cv-for re-render (no key-based diffing). Nested property mutations (`items[0].name = 'x'`) do trigger correctly via deep proxy — but the whole list re-renders. |
 | SSR | Not supported. Courvux is browser-only. |

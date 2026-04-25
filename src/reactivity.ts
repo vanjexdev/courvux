@@ -3,6 +3,18 @@ const ARRAY_MUTATING = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'so
 let _batchDepth = 0;
 const _batchQueue = new Map<string, () => void>();
 
+// Module-level dep tracking — used by computed auto-tracking across all reactive scopes
+type DepEntry = { sub: (key: string, cb: Function) => () => void; key: string };
+let _activeEffect: DepEntry[] | null = null;
+
+export function collectDeps(fn: () => void): DepEntry[] {
+    const deps: DepEntry[] = [];
+    const prev = _activeEffect;
+    _activeEffect = deps;
+    try { fn(); } finally { _activeEffect = prev; }
+    return deps;
+}
+
 export function batchUpdate(fn: () => void): void {
     _batchDepth++;
     try { fn(); } finally {
@@ -61,6 +73,9 @@ export function createReactivityScope() {
     const createReactiveState = <T extends object>(initialData: T): T => {
         return new Proxy(initialData, {
             get(target, key: string) {
+                if (typeof key === 'string' && !key.startsWith('$') && _activeEffect) {
+                    _activeEffect.push({ sub: subscribe, key });
+                }
                 const val = target[key as keyof T];
                 if (typeof key === 'string' && !key.startsWith('$') && val !== null && typeof val === 'object') {
                     return makeDeepProxy(val, () => notifyKey(key));
