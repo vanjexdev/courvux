@@ -1,4 +1,4 @@
-const storeSubscribers = new WeakMap<object, (key: string, cb: Function) => void>();
+const storeSubscribers = new WeakMap<object, (key: string, cb: Function) => () => void>();
 
 export interface StoreConfig<T extends object> {
     state: T;
@@ -6,11 +6,12 @@ export interface StoreConfig<T extends object> {
 }
 
 export function createStore<T extends object>(config: StoreConfig<T>): T & Record<string, any> {
-    const listeners: Record<string, Function[]> = {};
+    const listeners: Record<string, Set<Function>> = {};
 
-    const subscribe = (key: string, cb: Function) => {
-        if (!listeners[key]) listeners[key] = [];
-        listeners[key].push(cb);
+    const subscribe = (key: string, cb: Function): (() => void) => {
+        if (!listeners[key]) listeners[key] = new Set();
+        listeners[key].add(cb);
+        return () => { listeners[key]?.delete(cb); };
     };
 
     const proxy = new Proxy({ ...config.state, ...(config.actions ?? {}) } as any, {
@@ -28,6 +29,6 @@ export function createStore<T extends object>(config: StoreConfig<T>): T & Recor
     return proxy;
 }
 
-export function subscribeToStore(store: object, key: string, cb: Function) {
-    storeSubscribers.get(store)?.(key, cb);
+export function subscribeToStore(store: object, key: string, cb: Function): () => void {
+    return storeSubscribers.get(store)?.(key, cb) ?? (() => {});
 }

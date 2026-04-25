@@ -2,7 +2,8 @@ import { ComponentConfig, Router } from './types.js';
 import { subscribeToStore } from './store.js';
 
 export interface WalkContext {
-    subscribe: (key: string, cb: Function) => void;
+    subscribe: (key: string, cb: Function) => () => void;
+    storeSubscribeOverride?: (store: object, key: string, cb: Function) => () => void;
     components?: Record<string, ComponentConfig>;
     router?: Router;
     store?: Record<string, any>;
@@ -23,21 +24,23 @@ export const evaluate = (expr: string, state: any): any => {
     }
 };
 
-export const subscribeExpr = (expr: string, context: WalkContext, cb: Function) => {
+export const subscribeExpr = (expr: string, context: WalkContext, cb: Function): (() => void) => {
     if (expr.startsWith('$store.') && context.store) {
-        subscribeToStore(context.store, expr.slice(7), cb);
-    } else {
-        context.subscribe(expr, cb);
+        if (context.storeSubscribeOverride) {
+            return context.storeSubscribeOverride(context.store, expr.slice(7), cb);
+        }
+        return subscribeToStore(context.store, expr.slice(7), cb);
     }
+    return context.subscribe(expr, cb);
 };
 
-// Extrae identificadores de una expresión para suscribirse a sus deps
-const subscribeDeps = (expr: string, context: WalkContext, cb: Function) => {
+const subscribeDeps = (expr: string, context: WalkContext, cb: Function): (() => void) => {
     const keywords = new Set(['true', 'false', 'null', 'undefined', 'in', 'of', 'typeof', 'instanceof']);
     const tokens = expr.match(/\$?[a-zA-Z_][\w$]*(?:\.\$?[a-zA-Z_][\w$]*)*/g) ?? [];
     const deps = [...new Set(tokens.filter(t => !keywords.has(t.split('.')[0])))];
-    if (deps.length === 0) return;
-    deps.forEach(dep => subscribeExpr(dep, context, cb));
+    if (deps.length === 0) return () => {};
+    const unsubs = deps.map(dep => subscribeExpr(dep, context, cb));
+    return () => unsubs.forEach(u => u());
 };
 
 const setStateValue = (expr: string, state: any, value: any) => {
@@ -68,18 +71,21 @@ export async function walk(el: Node, state: any, context: WalkContext) {
         // Texto: interpolación {{ expr }}
         if (node.nodeType === 3) {
             const text = node.textContent || '';
-            const matches = text.match(/\{\{\s*([\w$]+(?:\.[\w$]+)*)\s*\}\}/g);
+            const matches = text.match(/\{\{([\s\S]+?)\}\}/g);
             if (matches) {
                 const originalText = text;
                 const update = () => {
                     let newText = originalText;
                     matches.forEach(m => {
-                        const expr = m.replace(/[{}\s]/g, '');
+                        const expr = m.replace(/^\{\{\s*/, '').replace(/\s*\}\}$/, '');
                         newText = newText.replace(m, evaluate(expr, state) ?? '');
                     });
                     node.textContent = newText;
                 };
-                matches.forEach(m => subscribeExpr(m.replace(/[{}\s]/g, ''), context, update));
+                matches.forEach(m => {
+                    const expr = m.replace(/^\{\{\s*/, '').replace(/\s*\}\}$/, '');
+                    subscribeDeps(expr, context, update);
+                });
                 update();
             }
             i++;
@@ -102,8 +108,11 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 const anchor = document.createComment(`cv-for: ${collectionExpr}`);
                 element.replaceWith(anchor);
                 let rendered: Node[] = [];
+                let itemUnsubs: Array<() => void> = [];
 
                 const render = async () => {
+                    itemUnsubs.forEach(u => u());
+                    itemUnsubs = [];
                     rendered.forEach(n => n.parentNode?.removeChild(n));
                     rendered = [];
                     const collection = evaluate(collectionExpr, state);
@@ -113,10 +122,25 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                         : Object.entries(collection).map(([k, v]) => [v, k]);
                     const parent = anchor.parentNode!;
                     const insertBefore = anchor.nextSibling;
+
+                    const childContext: WalkContext = {
+                        ...context,
+                        subscribe: (key, cb) => {
+                            const unsub = context.subscribe(key, cb);
+                            itemUnsubs.push(unsub);
+                            return unsub;
+                        },
+                        storeSubscribeOverride: (store, key, cb) => {
+                            const unsub = subscribeToStore(store, key, cb);
+                            itemUnsubs.push(unsub);
+                            return unsub;
+                        }
+                    };
+
                     for (const [item, index] of entries) {
                         const clone = element.cloneNode(true) as HTMLElement;
                         const itemState = makeItemState(state, item, itemVar, index, indexVar);
-                        await walk(clone, itemState, context);
+                        await walk(clone, itemState, childContext);
                         parent.insertBefore(clone, insertBefore);
                         rendered.push(clone);
                     }
@@ -190,7 +214,6 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 rendering = false;
             };
 
-            // Deduplicar deps de toda la cadena → una sola suscripción por variable
             const allDeps = new Set<string>();
             chain.filter(b => b.condition).forEach(b => {
                 const kw = new Set(['true','false','null','undefined','in','of','typeof','instanceof']);
@@ -210,7 +233,6 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             const update = () => { element.style.display = evaluate(expr, state) ? '' : 'none'; };
             subscribeDeps(expr, context, update);
             update();
-            // no continue — sigue procesando el elemento normalmente
         }
 
         // cv-model
@@ -258,7 +280,6 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 update();
                 inputEl.addEventListener(event, () => setStateValue(expr, state, inputEl.value));
             }
-            // no continue — select necesita procesar sus <option> hijos
         }
 
         // router-view

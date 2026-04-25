@@ -1,9 +1,10 @@
 export function createReactivityScope() {
-    const listeners: Record<string, Function[]> = {};
+    const listeners: Record<string, Set<Function>> = {};
 
-    const subscribe = (key: string, callback: Function): void => {
-        if (!listeners[key]) listeners[key] = [];
-        listeners[key].push(callback);
+    const subscribe = (key: string, callback: Function): (() => void) => {
+        if (!listeners[key]) listeners[key] = new Set();
+        listeners[key].add(callback);
+        return () => { listeners[key]?.delete(callback); };
     };
 
     const createReactiveState = <T extends object>(initialData: T): T => {

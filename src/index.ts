@@ -1,18 +1,27 @@
-import { AppConfig, ComponentConfig } from './types.js';
+import { AppConfig, ComponentConfig, RouteMatch } from './types.js';
 import { createReactivityScope } from './reactivity.js';
 import { walk, WalkContext, evaluate, subscribeExpr } from './dom.js';
 import { setupRouterView } from './router.js';
 
 export { createRouter } from './router.js';
 export { createStore } from './store.js';
-export type { AppConfig, ComponentConfig, RouteConfig, Router } from './types.js';
+export type { AppConfig, ComponentConfig, RouteConfig, Router, RouteMatch } from './types.js';
 
-type AppContext = Omit<WalkContext, 'subscribe'>;
+type AppContext = Omit<WalkContext, 'subscribe'> & {
+    currentRoute?: RouteMatch;
+    baseUrl?: string;
+};
 
-async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppContext): Promise<any> {
+type MountResult = { state: any; destroy: () => void };
+
+async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppContext): Promise<MountResult> {
     if (config.templateUrl) {
-        const html = await fetch(config.templateUrl).then(r => r.text());
-        el.innerHTML = html;
+        const url = appContext.baseUrl
+            ? new URL(config.templateUrl, appContext.baseUrl).href
+            : config.templateUrl;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Failed to load template: ${url} (${res.status})`);
+        el.innerHTML = await res.text();
     } else if (config.template) {
         el.innerHTML = config.template;
     }
@@ -21,19 +30,23 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
     const state = createReactiveState({
         ...config.data,
         ...config.methods,
-        ...(appContext.store ? { $store: appContext.store } : {})
+        ...(appContext.store ? { $store: appContext.store } : {}),
+        ...(appContext.currentRoute ? { $route: appContext.currentRoute } : {})
     });
 
     await walk(el, state, { subscribe, ...appContext });
     el.removeAttribute('cv-cloak');
-    return state;
+
+    config.onMount?.call(state);
+
+    const destroy = () => { config.onDestroy?.call(state); };
+    return { state, destroy };
 }
 
 function createMountElement(appContext: AppContext): AppContext['mountElement'] {
     return async (el, tagName, parentState, parentContext) => {
         const componentConfig = appContext.components![tagName];
 
-        // Extraer props de atributos :prop="expr"
         const props: Record<string, any> = {};
         const propBindings: Array<{ propName: string; expr: string }> = [];
 
@@ -46,7 +59,6 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
             }
         });
 
-        // Contexto local: mezcla componentes globales + locales del componente
         const localContext: AppContext = {
             ...appContext,
             components: { ...appContext.components, ...componentConfig.components },
@@ -58,9 +70,8 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
             data: { ...componentConfig.data, ...props }
         };
 
-        const childState = await mount(el, configWithProps, localContext);
+        const { state: childState } = await mount(el, configWithProps, localContext);
 
-        // Suscribir cambios del padre → actualizar props del hijo
         if (childState) {
             propBindings.forEach(({ propName, expr }) => {
                 subscribeExpr(expr, { ...parentContext, subscribe: parentContext.subscribe }, () => {
@@ -75,10 +86,13 @@ export async function createApp(selector: string, config: AppConfig) {
     const root = document.querySelector(selector) as HTMLElement;
     if (!root) return;
 
+    const baseUrl = new URL('.', document.baseURI).href;
+
     const appContext: AppContext = {
         components: config.components,
         router: config.router,
         store: config.store,
+        baseUrl,
     };
 
     appContext.mountElement = createMountElement(appContext);
@@ -86,9 +100,16 @@ export async function createApp(selector: string, config: AppConfig) {
     if (config.router) {
         const router = config.router;
         appContext.mountRouterView = async (el: HTMLElement) => {
-            setupRouterView(el, router, (el, cfg) => mount(el, cfg, appContext));
+            let destroyPrev: (() => void) | null = null;
+            setupRouterView(el, router, async (el, cfg, route) => {
+                destroyPrev?.();
+                const routeContext: AppContext = { ...appContext, currentRoute: route };
+                const { destroy } = await mount(el, cfg, routeContext);
+                destroyPrev = destroy;
+            });
         };
     }
 
-    return mount(root, config, appContext);
+    const { state } = await mount(root, config, appContext);
+    return state;
 }
