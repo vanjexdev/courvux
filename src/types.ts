@@ -12,6 +12,7 @@ export type LazyComponent = () => Promise<{ default: ComponentConfig }>;
 
 export interface RouteConfig {
     path: string;
+    layout?: string;
     component: ComponentConfig | LazyComponent;
 }
 

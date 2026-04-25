@@ -1,6 +1,6 @@
 import { Router, RouteConfig, ComponentConfig, LazyComponent, RouteMatch } from './types.js';
 
-type MountFn = (el: HTMLElement, config: ComponentConfig, route: RouteMatch) => Promise<void>;
+type MountFn = (el: HTMLElement, config: ComponentConfig, route: RouteMatch, layout?: string) => Promise<void>;
 
 const lazyCache = new Map<LazyComponent, ComponentConfig>();
 
@@ -51,7 +51,7 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn)
             const params = matchRoute(route.path, path);
             if (params !== null) {
                 const config = await resolveComponent(route.component);
-                await mount(el, config, { params, path });
+                await mount(el, config, { params, path }, route.layout);
                 return;
             }
         }

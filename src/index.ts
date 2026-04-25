@@ -101,11 +101,26 @@ export async function createApp(selector: string, config: AppConfig) {
         const router = config.router;
         appContext.mountRouterView = async (el: HTMLElement) => {
             let destroyPrev: (() => void) | null = null;
-            setupRouterView(el, router, async (el, cfg, route) => {
+            setupRouterView(el, router, async (el, cfg, route, layout) => {
                 destroyPrev?.();
+                destroyPrev = null;
                 const routeContext: AppContext = { ...appContext, currentRoute: route };
-                const { destroy } = await mount(el, cfg, routeContext);
-                destroyPrev = destroy;
+
+                if (layout) {
+                    let componentDestroy: (() => void) | null = null;
+                    const layoutContext: AppContext = {
+                        ...routeContext,
+                        mountRouterView: async (innerEl: HTMLElement) => {
+                            const { destroy } = await mount(innerEl, cfg, routeContext);
+                            componentDestroy = destroy;
+                        }
+                    };
+                    const { destroy: layoutDestroy } = await mount(el, { template: layout }, layoutContext);
+                    destroyPrev = () => { componentDestroy?.(); layoutDestroy(); };
+                } else {
+                    const { destroy } = await mount(el, cfg, routeContext);
+                    destroyPrev = destroy;
+                }
             });
         };
     }
