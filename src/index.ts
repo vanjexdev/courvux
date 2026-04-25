@@ -5,7 +5,7 @@ import { setupRouterView } from './router.js';
 
 export { createRouter } from './router.js';
 export { createStore } from './store.js';
-export type { AppConfig, ComponentConfig, RouteConfig, Router, RouteMatch } from './types.js';
+export type { AppConfig, ComponentConfig, RouteConfig, Router, RouteMatch, NavigationGuard } from './types.js';
 
 type AppContext = Omit<WalkContext, 'subscribe'> & {
     currentRoute?: RouteMatch;
@@ -34,6 +34,28 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
         ...(appContext.currentRoute ? { $route: appContext.currentRoute } : {})
     });
 
+    // Computed properties — evaluated eagerly, re-run when this.x deps change
+    if (config.computed) {
+        Object.entries(config.computed).forEach(([key, fn]) => {
+            const compute = () => { (state as any)[key] = fn.call(state); };
+            const deps = [...fn.toString().matchAll(/this\.(\w+)/g)].map(m => m[1]);
+            [...new Set(deps)].forEach(dep => subscribe(dep, compute));
+            compute();
+        });
+    }
+
+    // Watchers — fire handler(newVal, oldVal) when key changes
+    if (config.watch) {
+        Object.entries(config.watch).forEach(([key, handler]) => {
+            let oldVal = (state as any)[key];
+            subscribe(key, () => {
+                const newVal = (state as any)[key];
+                handler.call(state, newVal, oldVal);
+                oldVal = newVal;
+            });
+        });
+    }
+
     await walk(el, state, { subscribe, ...appContext });
     el.removeAttribute('cv-cloak');
 
@@ -47,8 +69,12 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
     return async (el, tagName, parentState, parentContext) => {
         const componentConfig = appContext.components![tagName];
 
+        // Props — :prop="expr" bindings
         const props: Record<string, any> = {};
         const propBindings: Array<{ propName: string; expr: string }> = [];
+
+        // $emit handlers — @event="handler" on component tag
+        const emitHandlers: Record<string, Function> = {};
 
         Array.from(el.attributes).forEach(attr => {
             if (attr.name.startsWith(':')) {
@@ -56,8 +82,21 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
                 const expr = attr.value;
                 props[propName] = evaluate(expr, parentState);
                 propBindings.push({ propName, expr });
+            } else if (attr.name.startsWith('@')) {
+                const eventName = attr.name.slice(1);
+                const handlerName = attr.value;
+                emitHandlers[eventName] = (...args: any[]) => {
+                    if (typeof parentState[handlerName] === 'function') {
+                        parentState[handlerName].call(parentState, ...args);
+                    }
+                };
             }
         });
+
+        // Slots — capture children before mount replaces innerHTML
+        const slotNodes = Array.from(el.childNodes).map(n => n.cloneNode(true));
+        const hasSlotContent = slotNodes.some(n =>
+            n.nodeType === 1 || (n.nodeType === 3 && (n.textContent?.trim() ?? '') !== ''));
 
         const localContext: AppContext = {
             ...appContext,
@@ -67,11 +106,29 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
 
         const configWithProps: ComponentConfig = {
             ...componentConfig,
-            data: { ...componentConfig.data, ...props }
+            data: { ...componentConfig.data, ...props },
+            methods: {
+                ...componentConfig.methods,
+                $emit(_eventName: string, ..._args: any[]) {
+                    emitHandlers[_eventName]?.(..._args);
+                }
+            }
         };
 
         const { state: childState } = await mount(el, configWithProps, localContext);
 
+        // Inject slot content into <slot> element (walked with parent context)
+        if (hasSlotContent) {
+            const slotEl = el.querySelector('slot');
+            if (slotEl) {
+                const fragment = document.createDocumentFragment();
+                slotNodes.forEach(n => fragment.appendChild(n));
+                await walk(fragment, parentState, parentContext);
+                slotEl.replaceWith(fragment);
+            }
+        }
+
+        // Reactive prop bindings: parent changes → update child
         if (childState) {
             propBindings.forEach(({ propName, expr }) => {
                 subscribeExpr(expr, { ...parentContext, subscribe: parentContext.subscribe }, () => {
