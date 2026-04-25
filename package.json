@@ -11,9 +11,7 @@
         "dev:ts": "tsc -w",
         "dev:server": "node devserver.js",
         "dev": "concurrently \"npm run dev:ts\" \"npm run dev:server\"",
-        "build": "vite build && esbuild dist/index.js --bundle=false --minify --allow-overwrite --outfile=dist/index.js",
-        "build:types": "tsc -p tsconfig.types.json",
-        "build:all": "npm run build && npm run build:types"
+        "build": "vite build && esbuild dist/index.js --bundle=false --minify --allow-overwrite --outfile=dist/index.js && tsc -p tsconfig.types.json"
     },
     "devDependencies": {
         "@rollup/plugin-terser": "^1.0.0",

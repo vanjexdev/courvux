@@ -1,6 +1,24 @@
-import { Router, RouteConfig, ComponentConfig } from './types.js';
+import { Router, RouteConfig, ComponentConfig, LazyComponent, RouteMatch } from './types.js';
 
-type MountFn = (el: HTMLElement, config: ComponentConfig) => Promise<void>;
+type MountFn = (el: HTMLElement, config: ComponentConfig, route: RouteMatch) => Promise<void>;
+
+const lazyCache = new Map<LazyComponent, ComponentConfig>();
+
+async function resolveComponent(component: ComponentConfig | LazyComponent): Promise<ComponentConfig> {
+    if (typeof component !== 'function') return component;
+    if (lazyCache.has(component)) return lazyCache.get(component)!;
+    const mod = await component();
+    lazyCache.set(component, mod.default);
+    return mod.default;
+}
+
+function matchRoute(pattern: string, path: string): Record<string, string> | null {
+    const keys: string[] = [];
+    const regexStr = pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; });
+    const m = path.match(new RegExp(`^${regexStr}$`));
+    if (!m) return null;
+    return Object.fromEntries(keys.map((k, i) => [k, m[i + 1]]));
+}
 
 export function createRouter(routes: RouteConfig[], options: { mode?: 'hash' | 'history' } = {}): Router {
     const mode = options.mode ?? 'hash';
@@ -28,9 +46,15 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn)
 
     const render = async () => {
         const path = getCurrentPath();
-        const route = router.routes.find(r => r.path === path);
         el.innerHTML = '';
-        if (route) await mount(el, route.component);
+        for (const route of router.routes) {
+            const params = matchRoute(route.path, path);
+            if (params !== null) {
+                const config = await resolveComponent(route.component);
+                await mount(el, config, { params, path });
+                return;
+            }
+        }
     };
 
     window.addEventListener(router.mode === 'history' ? 'popstate' : 'hashchange', render);
