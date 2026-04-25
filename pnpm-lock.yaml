@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      lucide:
+        specifier: ^1.11.0
+        version: 1.11.0
     devDependencies:
       '@rollup/plugin-terser':
         specifier: ^1.0.0
@@ -626,6 +630,9 @@ packages:
 
   lodash@4.18.1:
     resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
+
+  lucide@1.11.0:
+    resolution: {integrity: sha512-2uvbGlcztUY+z0Ef++YCaxD6mtzrPsUJ1qWbIfqZrZGRxZBCL3icE6g2nzRTtJ6YywOoXC5blL/NmkLI66en5g==}
 
   merge-stream@2.0.0:
     resolution: {integrity: sha512-abv/qOcuPfk3URPfDzmZU1LKmuw8kT+0nIHvKrKgFrwifol/doWcdA4ZqsWQ8ENrFKkd67Mfpo/LovbIUsbt3w==}
@@ -1374,6 +1381,8 @@ snapshots:
       lightningcss-win32-x64-msvc: 1.32.0
 
   lodash@4.18.1: {}
+
+  lucide@1.11.0: {}
 
   merge-stream@2.0.0: {}
 

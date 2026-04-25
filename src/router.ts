@@ -1,6 +1,12 @@
-import { Router, RouteConfig, ComponentConfig, LazyComponent, RouteMatch } from './types.js';
+import type { Router, RouteConfig, ComponentConfig, LazyComponent, RouteMatch, NavigationGuard, ScrollBehavior } from './types.js';
 
-type MountFn = (el: HTMLElement, config: ComponentConfig, route: RouteMatch, layout?: string) => Promise<void>;
+export type RouteActivation = {
+    destroy: () => void;
+    activate?: () => void;
+    deactivate?: () => void;
+};
+
+type MountFn = (el: HTMLElement, config: ComponentConfig, route: RouteMatch, layout?: string, childRouter?: Router) => Promise<RouteActivation>;
 
 const BUILT_IN_STYLES = `
 router-view.fade-leave{animation:cv-fade-out 0.25s forwards}
@@ -49,7 +55,14 @@ async function resolveComponent(component: ComponentConfig | LazyComponent): Pro
     return mod.default;
 }
 
+function getViewComponent(route: RouteConfig, viewName: string): ComponentConfig | LazyComponent | undefined {
+    if (route.components) return route.components[viewName];
+    if (viewName === 'default') return route.component;
+    return undefined;
+}
+
 function matchRoute(pattern: string, path: string): Record<string, string> | null {
+    if (pattern === '*') return {};
     const keys: string[] = [];
     const regexStr = pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; });
     const m = path.match(new RegExp(`^${regexStr}$`));
@@ -57,13 +70,45 @@ function matchRoute(pattern: string, path: string): Record<string, string> | nul
     return Object.fromEntries(keys.map((k, i) => [k, m[i + 1]]));
 }
 
-export function createRouter(routes: RouteConfig[], options: { mode?: 'hash' | 'history'; transition?: string } = {}): Router {
+function matchRoutePrefix(pattern: string, path: string): { params: Record<string, string>; remaining: string } | null {
+    const keys: string[] = [];
+    const regexStr = pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; });
+    const m = path.match(new RegExp(`^${regexStr}(/.+)?$`));
+    if (!m) return null;
+    const params = Object.fromEntries(keys.map((k, i) => [k, m[i + 1]]));
+    const remaining = m[keys.length + 1] || '/';
+    return { params, remaining };
+}
+
+function normalizeRoutes(routes: RouteConfig[], prefix = ''): RouteConfig[] {
+    return routes.map(route => {
+        if (route.path === '*') return route;
+        const base = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
+        const fullPath = (base + route.path).replace(/\/+/g, '/') || '/';
+        if (!route.children?.length) return { ...route, path: fullPath };
+        return { ...route, path: fullPath, children: normalizeRoutes(route.children, fullPath === '/' ? '' : fullPath) };
+    });
+}
+
+const runGuard = (guard: NavigationGuard, routeMatch: RouteMatch): Promise<string | undefined> =>
+    new Promise<string | undefined>(resolve => guard(routeMatch, resolve));
+
+export function createRouter(routes: RouteConfig[], options: {
+    mode?: 'hash' | 'history';
+    transition?: string;
+    beforeEach?: NavigationGuard;
+    afterEach?: (to: RouteMatch, from: RouteMatch | null) => void;
+    scrollBehavior?: ScrollBehavior;
+} = {}): Router {
     const mode = options.mode ?? 'hash';
 
     const router: Router = {
-        routes,
+        routes: normalizeRoutes(routes),
         mode,
         transition: options.transition,
+        beforeEach: options.beforeEach,
+        afterEach: options.afterEach,
+        scrollBehavior: options.scrollBehavior,
         navigate(path: string) {
             if (mode === 'history') {
                 history.pushState({}, '', path);
@@ -77,55 +122,186 @@ export function createRouter(routes: RouteConfig[], options: { mode?: 'hash' | '
     return router;
 }
 
-export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn): void {
+export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn, name = 'default', onFirstRender?: () => void): () => void {
     const getCurrentPath = () => router.mode === 'history'
         ? window.location.pathname
         : window.location.hash.slice(1) || '/';
 
     if (router.transition) injectTransitionStyles();
 
+    let prevRouteMatch: RouteMatch | null = null;
+    let prevRouteConfig: RouteConfig | null = null;
+    let prevActivation: RouteActivation | null = null;
+    let currentParentKey: string | null = null;
+    let firstRenderDone = false;
+    const notifyFirstRender = () => {
+        if (!firstRenderDone) { firstRenderDone = true; onFirstRender?.(); }
+    };
+    const keepAliveCache = new Map<string, { fragment: DocumentFragment; activation: RouteActivation }>();
+
+    const leaveEl = (route: RouteConfig | null) => {
+        if (route?.keepAlive && prevActivation) {
+            prevActivation.deactivate?.();
+            const fragment = document.createDocumentFragment();
+            while (el.firstChild) fragment.appendChild(el.firstChild);
+            keepAliveCache.set(prevRouteMatch!.path, { fragment, activation: prevActivation });
+            prevActivation = null;
+        } else {
+            prevActivation?.destroy();
+            prevActivation = null;
+            el.innerHTML = '';
+        }
+    };
+
+    const mountWithLoading = async (route: RouteConfig, routeComp: ComponentConfig | LazyComponent, routeMatch: RouteMatch, layout?: string, childRouter?: Router): Promise<RouteActivation> => {
+        const isFirstLoad = typeof routeComp === 'function' && !lazyCache.has(routeComp as LazyComponent);
+        if (isFirstLoad && route.loadingTemplate) el.innerHTML = route.loadingTemplate;
+        const config = await resolveComponent(routeComp);
+        if (isFirstLoad && route.loadingTemplate) el.innerHTML = '';
+        return mount(el, config, routeMatch, layout, childRouter);
+    };
+
     const render = async () => {
         const path = getCurrentPath();
 
         for (const route of router.routes) {
+            // --- Nested routes ---
+            if (route.children?.length) {
+                const prefixMatch = matchRoutePrefix(route.path, path);
+                if (prefixMatch !== null) {
+                    for (const child of route.children) {
+                        const childParams = matchRoute(child.path, path);
+                        if (childParams !== null) {
+                            const routeMatch: RouteMatch = { params: prefixMatch.params, path, meta: route.meta };
+
+                            if (child.redirect) {
+                                const childMatch: RouteMatch = { params: childParams, path, meta: child.meta };
+                                const target = typeof child.redirect === 'function' ? child.redirect(childMatch) : child.redirect;
+                                router.navigate(target);
+                                return;
+                            }
+
+                            if (router.beforeEach) {
+                                const r = await runGuard(router.beforeEach, routeMatch);
+                                if (r) { router.navigate(r); return; }
+                            }
+                            if (route.beforeEnter) {
+                                const r = await runGuard(route.beforeEnter, routeMatch);
+                                if (r) { router.navigate(r); return; }
+                            }
+                            if (child.beforeEnter) {
+                                const childMatch: RouteMatch = { params: childParams, path, meta: child.meta };
+                                const r = await runGuard(child.beforeEnter, childMatch);
+                                if (r) { router.navigate(r); return; }
+                            }
+
+                            const parentKey = `${route.path}::${JSON.stringify(prefixMatch.params)}`;
+
+                            if (currentParentKey !== parentKey) {
+                                const transitionName = route.transition ?? router.transition;
+                                if (transitionName && el.hasChildNodes()) await animateEl(el, transitionName, 'leave');
+                                leaveEl(prevRouteConfig);
+
+                                const routeComp = getViewComponent(route, name);
+                                if (routeComp) {
+                                    const childRouter: Router = {
+                                        routes: route.children!,
+                                        mode: router.mode,
+                                        transition: route.transition ?? router.transition,
+                                        beforeEach: router.beforeEach,
+                                        afterEach: router.afterEach,
+                                        scrollBehavior: router.scrollBehavior,
+                                        navigate: (p) => router.navigate(p),
+                                    };
+                                    prevActivation = await mountWithLoading(route, routeComp, routeMatch, name === 'default' ? route.layout : undefined, name === 'default' ? childRouter : undefined);
+                                } else {
+                                    el.innerHTML = '';
+                                }
+                                currentParentKey = parentKey;
+                                if (transitionName) await animateEl(el, transitionName, 'enter');
+                            }
+
+                            const combined: RouteMatch = { params: { ...prefixMatch.params, ...childParams }, path, meta: child.meta ?? route.meta };
+                            router.afterEach?.(combined, prevRouteMatch);
+                            const scrollPos = router.scrollBehavior?.(combined, prevRouteMatch);
+                            if (scrollPos) window.scrollTo(scrollPos.x ?? 0, scrollPos.y ?? 0);
+                            prevRouteMatch = combined;
+                            prevRouteConfig = route;
+                            notifyFirstRender();
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // --- Exact match ---
             const params = matchRoute(route.path, path);
             if (params !== null) {
-                const routeMatch: RouteMatch = { params, path };
+                currentParentKey = null;
+                const routeMatch: RouteMatch = { params, path, meta: route.meta };
 
+                if (route.redirect) {
+                    const target = typeof route.redirect === 'function' ? route.redirect(routeMatch) : route.redirect;
+                    router.navigate(target);
+                    return;
+                }
+
+                if (router.beforeEach) {
+                    const r = await runGuard(router.beforeEach, routeMatch);
+                    if (r) { router.navigate(r); return; }
+                }
                 if (route.beforeEnter) {
-                    let redirectTo: string | undefined;
-                    await new Promise<void>(resolve => {
-                        route.beforeEnter!(routeMatch, (redirectPath?: string) => {
-                            redirectTo = redirectPath;
-                            resolve();
-                        });
-                    });
-                    if (redirectTo) { router.navigate(redirectTo); return; }
+                    const r = await runGuard(route.beforeEnter, routeMatch);
+                    if (r) { router.navigate(r); return; }
                 }
 
-                const transitionName = route.transition !== undefined
-                    ? route.transition
-                    : router.transition;
+                const transitionName = route.transition ?? router.transition;
+                if (transitionName && el.hasChildNodes()) await animateEl(el, transitionName, 'leave');
+                leaveEl(prevRouteConfig);
 
-                if (transitionName && el.hasChildNodes()) {
-                    await animateEl(el, transitionName, 'leave');
+                const routeComp = getViewComponent(route, name);
+                if (routeComp) {
+                    const cacheKey = routeMatch.path;
+                    if (route.keepAlive && keepAliveCache.has(cacheKey)) {
+                        const cached = keepAliveCache.get(cacheKey)!;
+                        el.appendChild(cached.fragment);
+                        prevActivation = cached.activation;
+                        prevActivation.activate?.();
+                        keepAliveCache.delete(cacheKey);
+                    } else {
+                        prevActivation = await mountWithLoading(route, routeComp, routeMatch, name === 'default' ? route.layout : undefined);
+                    }
+                } else {
+                    el.innerHTML = '';
+                    prevActivation = null;
                 }
 
-                el.innerHTML = '';
-                const config = await resolveComponent(route.component);
-                await mount(el, config, routeMatch, route.layout);
+                if (transitionName) await animateEl(el, transitionName, 'enter');
 
-                if (transitionName) {
-                    await animateEl(el, transitionName, 'enter');
-                }
-
+                router.afterEach?.(routeMatch, prevRouteMatch);
+                const scrollPos = router.scrollBehavior?.(routeMatch, prevRouteMatch);
+                if (scrollPos) window.scrollTo(scrollPos.x ?? 0, scrollPos.y ?? 0);
+                prevRouteMatch = routeMatch;
+                prevRouteConfig = route;
+                notifyFirstRender();
                 return;
             }
         }
 
-        el.innerHTML = '';
+        currentParentKey = null;
+        leaveEl(prevRouteConfig);
+        prevRouteConfig = null;
+        notifyFirstRender();
     };
 
-    window.addEventListener(router.mode === 'history' ? 'popstate' : 'hashchange', render);
+    const eventType = router.mode === 'history' ? 'popstate' : 'hashchange';
+    window.addEventListener(eventType, render);
     render();
+    return () => {
+        window.removeEventListener(eventType, render);
+        prevActivation?.destroy();
+        prevActivation = null;
+        keepAliveCache.forEach(({ activation }) => activation.destroy());
+        keepAliveCache.clear();
+    };
 }

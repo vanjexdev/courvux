@@ -1,5 +1,42 @@
+const ARRAY_MUTATING = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']);
+
+let _batchDepth = 0;
+const _batchQueue = new Map<string, () => void>();
+
+export function batchUpdate(fn: () => void): void {
+    _batchDepth++;
+    try { fn(); } finally {
+        _batchDepth--;
+        if (_batchDepth === 0) {
+            const queue = [..._batchQueue.values()];
+            _batchQueue.clear();
+            queue.forEach(n => n());
+        }
+    }
+}
+
+function makeDeepProxy(val: any, notify: () => void): any {
+    if (val === null || typeof val !== 'object') return val;
+    return new Proxy(val, {
+        get(t, k: string) {
+            if (Array.isArray(t) && ARRAY_MUTATING.has(k)) {
+                return (...args: any[]) => {
+                    const result = (Array.prototype as any)[k].apply(t, args);
+                    notify();
+                    return result;
+                };
+            }
+            const v = t[k];
+            if (v !== null && typeof v === 'object') return makeDeepProxy(v, notify);
+            return v;
+        },
+        set(t, k: string, v) { t[k] = v; notify(); return true; }
+    });
+}
+
 export function createReactivityScope() {
     const listeners: Record<string, Set<Function>> = {};
+    const scopeId = Math.random().toString(36).slice(2);
 
     const subscribe = (key: string, callback: Function): (() => void) => {
         if (!listeners[key]) listeners[key] = new Set();
@@ -7,18 +44,37 @@ export function createReactivityScope() {
         return () => { listeners[key]?.delete(callback); };
     };
 
+    const notifyKey = (key: string) => {
+        if (_batchDepth > 0) {
+            _batchQueue.set(`${scopeId}:${key}`, () => listeners[key]?.forEach(cb => cb()));
+        } else {
+            listeners[key]?.forEach(cb => cb());
+        }
+    };
+
+    const setInterceptors: Record<string, (val: any) => void> = {};
+
+    const registerSetInterceptor = (key: string, fn: (val: any) => void) => {
+        setInterceptors[key] = fn;
+    };
+
     const createReactiveState = <T extends object>(initialData: T): T => {
         return new Proxy(initialData, {
             get(target, key: string) {
-                return target[key as keyof T];
+                const val = target[key as keyof T];
+                if (typeof key === 'string' && !key.startsWith('$') && val !== null && typeof val === 'object') {
+                    return makeDeepProxy(val, () => notifyKey(key));
+                }
+                return val;
             },
             set(target, key: string, value) {
+                if (setInterceptors[key]) { setInterceptors[key](value); return true; }
                 (target as any)[key] = value;
-                listeners[key]?.forEach(cb => cb());
+                notifyKey(key);
                 return true;
             }
         });
     };
 
-    return { subscribe, createReactiveState };
+    return { subscribe, createReactiveState, registerSetInterceptor };
 }

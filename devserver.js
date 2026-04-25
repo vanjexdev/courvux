@@ -5,6 +5,7 @@ import { join, extname } from 'node:path';
 const MIME = {
     '.html': 'text/html',
     '.js':   'application/javascript',
+    '.mjs':  'application/javascript',
     '.css':  'text/css',
     '.json': 'application/json',
 };
@@ -12,7 +13,7 @@ const MIME = {
 const server = createServer(async (req, res) => {
     const url = req.url.split('?')[0];
 
-    const filePath = url.startsWith('/dist/')
+    const filePath = url.startsWith('/dist/') || url.startsWith('/node_modules/')
         ? join(process.cwd(), url)
         : join(process.cwd(), 'app', url === '/' ? '/index.html' : url);
 
