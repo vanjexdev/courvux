@@ -589,28 +589,32 @@ export async function walk(el: Node, state: any, context: WalkContext) {
 
         // router-link
         if (tagName === 'router-link') {
-            const to = element.getAttribute('to') || '/';
+            const toExpr = element.getAttribute(':to');
+            const toStatic = element.getAttribute('to');
+            const getTo = () => toExpr ? String(evaluate(toExpr, state) ?? '/') : (toStatic || '/');
             const a = document.createElement('a');
             a.innerHTML = element.innerHTML;
             Array.from(element.attributes).forEach(attr => {
-                if (attr.name !== 'to') a.setAttribute(attr.name, attr.value);
+                if (attr.name !== 'to' && attr.name !== ':to') a.setAttribute(attr.name, attr.value);
             });
             const getCurrentPath = () => context.router?.mode === 'history'
                 ? window.location.pathname
                 : window.location.hash.slice(1) || '/';
             const updateActive = () => {
+                const to = getTo();
                 const isActive = getCurrentPath() === to;
+                if (context.router?.mode === 'history') a.href = to;
+                else a.href = `#${to}`;
                 if (isActive) { a.setAttribute('aria-current', 'page'); a.classList.add('active'); }
                 else { a.removeAttribute('aria-current'); a.classList.remove('active'); }
             };
             if (context.router?.mode === 'history') {
-                a.href = to;
-                a.addEventListener('click', e => { e.preventDefault(); context.router!.navigate(to); });
+                a.addEventListener('click', e => { e.preventDefault(); context.router!.navigate(getTo()); });
                 window.addEventListener('popstate', updateActive);
             } else {
-                a.href = `#${to}`;
                 window.addEventListener('hashchange', updateActive);
             }
+            if (toExpr) subscribeExpr(toExpr, context, updateActive);
             updateActive();
             element.replaceWith(a);
             await walk(a, state, context);
