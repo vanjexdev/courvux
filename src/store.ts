@@ -6,6 +6,18 @@ export interface StoreConfig<T extends object> {
     modules?: Record<string, StoreConfig<any>>;
 }
 
+function makeDeepNotifyProxy(val: any, notify: () => void): any {
+    if (val === null || typeof val !== 'object') return val;
+    return new Proxy(val, {
+        get(t, k: string) {
+            const v = t[k];
+            if (v !== null && typeof v === 'object') return makeDeepNotifyProxy(v, notify);
+            return v;
+        },
+        set(t, k: string, v) { t[k] = v; notify(); return true; }
+    });
+}
+
 export function createStore<T extends object>(config: StoreConfig<T>): T & Record<string, any> {
     const listeners: Record<string, Set<Function>> = {};
 
@@ -13,6 +25,11 @@ export function createStore<T extends object>(config: StoreConfig<T>): T & Recor
         if (!listeners[key]) listeners[key] = new Set();
         listeners[key].add(cb);
         return () => { listeners[key]?.delete(cb); };
+    };
+
+    const notifyKey = (key: string) => {
+        const cbs = listeners[key] ? [...listeners[key]] : [];
+        cbs.forEach(cb => cb());
     };
 
     const stateData = { ...config.state } as Record<string, any>;
@@ -25,7 +42,6 @@ export function createStore<T extends object>(config: StoreConfig<T>): T & Recor
         }
     });
 
-    // Create sub-stores for each module
     Object.keys(modules).forEach(name => {
         if (name in stateData || name in actions) {
             console.warn(`[courvux] Store: module "${name}" conflicts with existing key. Rename it.`);
@@ -38,12 +54,17 @@ export function createStore<T extends object>(config: StoreConfig<T>): T & Recor
             if (key in actions) {
                 return (...args: any[]) => (actions[key] as Function).apply(proxy, args);
             }
-            return target[key];
+            const val = target[key];
+            // Wrap plain nested objects so deep mutations (e.g. store.a.b.c = x) notify top-level key
+            if (val !== null && typeof val === 'object' && !storeSubscribers.has(val)) {
+                return makeDeepNotifyProxy(val, () => notifyKey(key));
+            }
+            return val;
         },
         set(target, key: string, value) {
-            if (key in modules) return true; // protect module sub-stores
+            if (key in modules) return true;
             target[key] = value;
-            listeners[key]?.forEach(cb => cb());
+            notifyKey(key);
             return true;
         }
     });
@@ -55,13 +76,14 @@ export function createStore<T extends object>(config: StoreConfig<T>): T & Recor
 export function subscribeToStore(store: object, key: string, cb: Function): () => void {
     const dotIdx = key.indexOf('.');
     if (dotIdx >= 0) {
-        const moduleKey = key.slice(0, dotIdx);
+        const topKey = key.slice(0, dotIdx);
         const restKey = key.slice(dotIdx + 1);
-        const subStore = (store as any)[moduleKey];
+        const subStore = (store as any)[topKey];
         if (subStore && storeSubscribers.has(subStore)) {
             return subscribeToStore(subStore, restKey, cb);
         }
-        return () => {};
+        // Plain nested object: subscribe to top-level key; fires on any deep mutation
+        return storeSubscribers.get(store)?.(topKey, cb) ?? (() => {});
     }
     return storeSubscribers.get(store)?.(key, cb) ?? (() => {});
 }

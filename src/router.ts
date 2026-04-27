@@ -117,7 +117,22 @@ export function createRouter(routes: RouteConfig[], options: {
             } else {
                 window.location.hash = path;
             }
-        }
+        },
+        replace(path: string) {
+            if (mode === 'history') {
+                history.replaceState({}, '', path);
+                window.dispatchEvent(new PopStateEvent('popstate'));
+            } else {
+                const base = window.location.href.split('#')[0];
+                window.location.replace(`${base}#${path}`);
+            }
+        },
+        back() {
+            history.back();
+        },
+        forward() {
+            history.forward();
+        },
     };
 
     return router;
@@ -213,6 +228,9 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                                         afterEach: router.afterEach,
                                         scrollBehavior: router.scrollBehavior,
                                         navigate: (p) => router.navigate(p),
+                                        replace: (p) => router.replace(p),
+                                        back: () => router.back(),
+                                        forward: () => router.forward(),
                                     };
                                     prevActivation = await mountWithLoading(route, routeComp, routeMatch, name === 'default' ? route.layout : undefined, name === 'default' ? childRouter : undefined);
                                 } else {

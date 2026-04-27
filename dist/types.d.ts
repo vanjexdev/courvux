@@ -20,6 +20,7 @@ export type ComputedDef = ((this: any) => any) | {
     set?(this: any, val: any): void;
 };
 export interface ComponentConfig {
+    name?: string;
     templateUrl?: string;
     template?: string;
     data?: Record<string, any>;
@@ -67,6 +68,9 @@ export interface Router {
     afterEach?: (to: RouteMatch, from: RouteMatch | null) => void;
     scrollBehavior?: ScrollBehavior;
     navigate(path: string): void;
+    replace(path: string): void;
+    back(): void;
+    forward(): void;
 }
 export interface AppConfig extends ComponentConfig {
     components?: Record<string, ComponentConfig>;
