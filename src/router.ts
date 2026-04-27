@@ -71,6 +71,7 @@ function matchRoute(pattern: string, path: string): Record<string, string> | nul
 }
 
 function matchRoutePrefix(pattern: string, path: string): { params: Record<string, string>; remaining: string } | null {
+    if (pattern === '/') return { params: {}, remaining: path };
     const keys: string[] = [];
     const regexStr = pattern.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; });
     const m = path.match(new RegExp(`^${regexStr}(/.+)?$`));
