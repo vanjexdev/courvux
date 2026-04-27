@@ -2,10 +2,15 @@ import { AppConfig, ComponentConfig, RouteMatch, Router, WatcherOptions, Directi
 import { createReactivityScope, batchUpdate, collectDeps } from './reactivity.js';
 import { walk, WalkContext, evaluate, subscribeExpr, subscribeDeps, setStateValue } from './dom.js';
 import { setupRouterView, RouteActivation } from './router.js';
+import { setupDevTools, nextDevToolsId } from './devtools.js';
+import { SSR_ATTR } from './ssr.js';
 
 export { createRouter } from './router.js';
 export { createStore } from './store.js';
 export { batchUpdate } from './reactivity.js';
+export { setupDevTools } from './devtools.js';
+export { renderToString, SSR_ATTR } from './ssr.js';
+export type { DevToolsHook, DevToolsComponentInstance } from './devtools.js';
 export type { AppConfig, ComponentConfig, RouteConfig, Router, RouteMatch, NavigationGuard, ScrollBehavior, WatcherEntry, WatcherOptions, DirectiveBinding, DirectiveDef, DirectiveShorthand, LazyComponent, ComputedDef } from './types.js';
 export type { StoreConfig } from './store.js';
 
@@ -39,6 +44,8 @@ const tryClone = (val: any): any => {
 };
 
 async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppContext): Promise<MountResult> {
+    // Always inject template so walk() can find {{ }} expressions and wire reactivity.
+    // SSR provides the initial fast paint; client takes over completely once JS loads.
     if (config.templateUrl) {
         const url = appContext.baseUrl
             ? new URL(config.templateUrl, appContext.baseUrl).href
@@ -49,6 +56,10 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
     } else if (config.template) {
         el.innerHTML = config.template;
     }
+
+    // Remove SSR marker (no-op if not present)
+    el.removeAttribute(SSR_ATTR);
+    el.querySelector(`[${SSR_ATTR}]`)?.removeAttribute(SSR_ATTR);
 
     const refs: Record<string, any> = {};
     const { subscribe, createReactiveState, registerSetInterceptor } = createReactivityScope();
@@ -108,7 +119,13 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
             const compute = () => {
                 unsubs.forEach(u => u());
                 unsubs = [];
-                const rawDeps = collectDeps(() => { (state as any)[key] = getter.call(state); });
+                // Collect deps by running the getter ONLY — do NOT set inside collectDeps.
+                // Setting inside would trigger notifyKey(key) while _activeEffect is active,
+                // causing downstream DOM callbacks to pollute deps → computed subscribes to
+                // its own output key → infinite loop.
+                let computedValue: any;
+                const rawDeps = collectDeps(() => { try { computedValue = getter.call(state); } catch { /* */ } });
+                (state as any)[key] = computedValue;
                 const seen = new Map<Function, Set<string>>();
                 for (const { sub, key: k } of rawDeps) {
                     if (!seen.has(sub)) seen.set(sub, new Set());
@@ -166,6 +183,8 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
         let currentEl: HTMLElement | null = null;
         let currentDestroy: (() => void) | null = null;
 
+        const fallbackHtml = originalEl.getAttribute('loading-template') ?? '';
+
         const doRender = async () => {
             currentDestroy?.();
             currentDestroy = null;
@@ -175,7 +194,17 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
             if (!compValue) return;
 
             let config: ComponentConfig | undefined;
-            if (typeof compValue === 'string') {
+            if (typeof compValue === 'function') {
+                if (fallbackHtml) {
+                    const fb = document.createElement('div');
+                    fb.innerHTML = fallbackHtml;
+                    anchor.parentNode?.insertBefore(fb, anchor.nextSibling);
+                    currentEl = fb;
+                }
+                const mod = await (compValue as () => Promise<{ default: ComponentConfig }>)();
+                config = mod.default;
+                if (currentEl?.parentNode) { currentEl.parentNode.removeChild(currentEl); currentEl = null; }
+            } else if (typeof compValue === 'string') {
                 config = walkContext.components?.[compValue];
             } else if (compValue && typeof compValue === 'object') {
                 config = compValue as ComponentConfig;
@@ -236,6 +265,41 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
         } else {
             throw err;
         }
+    }
+
+    // DevTools integration
+    const devtools = typeof window !== 'undefined' ? window.__COURVUX_DEVTOOLS__ : undefined;
+    const devId = devtools ? nextDevToolsId() : 0;
+    if (devtools) {
+        const s = state as Record<string, any>;
+        const updateListeners = new Set<() => void>();
+        const devInstance = {
+            id: devId,
+            name: config.name ?? el.tagName.toLowerCase(),
+            el,
+            getState: () => {
+                const snap: Record<string, any> = {};
+                for (const k of Object.keys(s)) {
+                    if (k.startsWith('$') || typeof s[k] === 'function') continue;
+                    try { snap[k] = s[k]; } catch { /* getter error */ }
+                }
+                return snap;
+            },
+            setState: (key: string, value: any) => { s[key] = value; },
+            subscribe: (cb: () => void) => {
+                updateListeners.add(cb);
+                return () => updateListeners.delete(cb);
+            },
+            children: [],
+        };
+        Object.keys(s).filter(k => !k.startsWith('$') && typeof s[k] !== 'function').forEach(k => {
+            subscribe(k, () => {
+                devtools._emit('update', devInstance);
+                updateListeners.forEach(cb => cb());
+            });
+        });
+        devtools._registerInstance(devInstance);
+        cleanups.push(() => devtools._unregisterInstance(devId));
     }
 
     return {
@@ -391,12 +455,16 @@ export interface CourvuxApp {
     use(plugin: CourvuxPlugin): CourvuxApp;
     directive(name: string, def: DirectiveDef | DirectiveShorthand): CourvuxApp;
     mount(selector: string): Promise<CourvuxApp>;
+    mountAll(selector?: string): Promise<CourvuxApp>;
+    destroy(): void;
     router?: Router;
 }
 
 export function createApp(config: AppConfig): CourvuxApp {
+    if (typeof window !== 'undefined') setupDevTools();
     const plugins: CourvuxPlugin[] = [];
     const directives: Record<string, DirectiveDef | DirectiveShorthand> = { ...config.directives };
+    const destroyFns: Array<() => void> = [];
 
     const app: CourvuxApp = {
         router: config.router,
@@ -411,13 +479,19 @@ export function createApp(config: AppConfig): CourvuxApp {
             directives[name] = def;
             return app;
         },
-        mount: async (selector: string) => { await _mount(selector); return app; }
+        mount: async (selector: string) => { await _mount(selector); return app; },
+        mountAll: async (selector = '[data-courvux]') => {
+            const els = Array.from(document.querySelectorAll<HTMLElement>(selector));
+            await Promise.all(els.map(el => _mountEl(el)));
+            return app;
+        },
+        destroy() {
+            destroyFns.forEach(fn => fn());
+            destroyFns.length = 0;
+        },
     };
 
-    const _mount = async (selector: string) => {
-        const root = document.querySelector(selector) as HTMLElement;
-        if (!root) return;
-
+    const _mountEl = async (root: HTMLElement) => {
         const baseUrl = new URL('.', document.baseURI).href;
 
         const appContext: AppContext = {
@@ -512,8 +586,15 @@ export function createApp(config: AppConfig): CourvuxApp {
             };
         }
 
-        const { state } = await mount(root, config, appContext);
-        return state;
+        const result = await mount(root, config, appContext);
+        destroyFns.push(result.destroy);
+        return result.state;
+    };
+
+    const _mount = async (selector: string) => {
+        const root = document.querySelector(selector) as HTMLElement;
+        if (!root) return;
+        return _mountEl(root);
     };
 
     return app;

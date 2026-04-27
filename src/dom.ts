@@ -243,52 +243,114 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 element.replaceWith(anchor);
                 let rendered: Node[] = [];
                 let itemUnsubs: Array<() => void> = [];
+                // keyed diffing: key → { el, cleanup }
+                const keyNodeMap = new Map<any, { el: HTMLElement; destroy: () => void }>();
 
                 const render = async () => {
-                    itemUnsubs.forEach(u => u());
-                    itemUnsubs = [];
-                    rendered.forEach(n => n.parentNode?.removeChild(n));
-                    rendered = [];
                     const collection = evaluate(collectionExpr, state);
-                    if (!collection) return;
-                    const entries: [any, any][] = Array.isArray(collection)
-                        ? collection.map((v: any, idx: number) => [v, idx])
-                        : Object.entries(collection).map(([k, v]) => [v, k]);
+                    const entries: [any, any][] = !collection ? [] :
+                        Array.isArray(collection)
+                            ? collection.map((v: any, idx: number) => [v, idx])
+                            : Object.entries(collection).map(([k, v]) => [v, k]);
 
                     if (keyExpr) {
+                        // --- keyed diffing ---
+                        const newKeys: any[] = [];
+                        const newEntries = new Map<any, [any, any]>();
                         const seen = new Set();
-                        entries.forEach(([item, index]) => {
+                        for (const [item, index] of entries) {
                             const k = evaluate(keyExpr, makeItemState(state, item, itemVar, index, indexVar));
                             if (seen.has(k)) console.warn(`[courvux] cv-for: duplicate :key "${k}" in "${collectionExpr}"`);
                             seen.add(k);
-                        });
-                    }
-
-                    const parent = anchor.parentNode!;
-                    const insertBefore = anchor.nextSibling;
-
-                    const childContext: WalkContext = {
-                        ...context,
-                        subscribe: (key, cb) => {
-                            const unsub = context.subscribe(key, cb);
-                            itemUnsubs.push(unsub);
-                            return unsub;
-                        },
-                        storeSubscribeOverride: (store, key, cb) => {
-                            const unsub = subscribeToStore(store, key, cb);
-                            itemUnsubs.push(unsub);
-                            return unsub;
+                            newKeys.push(k);
+                            newEntries.set(k, [item, index]);
                         }
-                    };
 
-                    for (const [item, index] of entries) {
-                        const clone = element.cloneNode(true) as HTMLElement;
-                        const itemState = makeItemState(state, item, itemVar, index, indexVar);
-                        await walk(clone, itemState, childContext);
-                        parent.insertBefore(clone, insertBefore);
-                        rendered.push(clone);
+                        // remove stale nodes
+                        for (const [k, { el, destroy }] of keyNodeMap) {
+                            if (!newEntries.has(k)) {
+                                destroy();
+                                el.parentNode?.removeChild(el);
+                                keyNodeMap.delete(k);
+                            }
+                        }
+
+                        // create nodes for new keys
+                        const parent = anchor.parentNode!;
+                        for (const k of newKeys) {
+                            if (!keyNodeMap.has(k)) {
+                                const [item, index] = newEntries.get(k)!;
+                                const clone = element.cloneNode(true) as HTMLElement;
+                                const perItemUnsubs: Array<() => void> = [];
+                                const childCtx: WalkContext = {
+                                    ...context,
+                                    subscribe: (key, cb) => {
+                                        const unsub = context.subscribe(key, cb);
+                                        perItemUnsubs.push(unsub);
+                                        return unsub;
+                                    },
+                                    storeSubscribeOverride: (store, key, cb) => {
+                                        const unsub = subscribeToStore(store, key, cb);
+                                        perItemUnsubs.push(unsub);
+                                        return unsub;
+                                    }
+                                };
+                                await walk(clone, makeItemState(state, item, itemVar, index, indexVar), childCtx);
+                                keyNodeMap.set(k, { el: clone, destroy: () => perItemUnsubs.forEach(u => u()) });
+                            }
+                        }
+
+                        // reorder: walk from anchor, place each key node in order
+                        let cursor: ChildNode | null = anchor.nextSibling;
+                        for (const k of newKeys) {
+                            const { el } = keyNodeMap.get(k)!;
+                            if (el !== cursor) {
+                                parent.insertBefore(el, cursor);
+                            } else {
+                                cursor = el.nextSibling;
+                            }
+                        }
+                        rendered = newKeys.map(k => keyNodeMap.get(k)!.el);
+
+                    } else {
+                        // --- no key: destroy and recreate all ---
+                        itemUnsubs.forEach(u => u());
+                        itemUnsubs = [];
+                        rendered.forEach(n => n.parentNode?.removeChild(n));
+                        rendered = [];
+                        if (!entries.length) return;
+
+                        const parent = anchor.parentNode!;
+                        const insertBefore = anchor.nextSibling;
+                        const childContext: WalkContext = {
+                            ...context,
+                            subscribe: (key, cb) => {
+                                const unsub = context.subscribe(key, cb);
+                                itemUnsubs.push(unsub);
+                                return unsub;
+                            },
+                            storeSubscribeOverride: (store, key, cb) => {
+                                const unsub = subscribeToStore(store, key, cb);
+                                itemUnsubs.push(unsub);
+                                return unsub;
+                            }
+                        };
+                        for (const [item, index] of entries) {
+                            const clone = element.cloneNode(true) as HTMLElement;
+                            await walk(clone, makeItemState(state, item, itemVar, index, indexVar), childContext);
+                            parent.insertBefore(clone, insertBefore);
+                            rendered.push(clone);
+                        }
                     }
                 };
+
+                context.registerCleanup?.(() => {
+                    keyNodeMap.forEach(({ el, destroy }) => { destroy(); el.parentNode?.removeChild(el); });
+                    keyNodeMap.clear();
+                    itemUnsubs.forEach(u => u());
+                    rendered.forEach(n => n.parentNode?.removeChild(n));
+                    rendered = [];
+                });
 
                 subscribeDeps(collectionExpr, context, render);
                 await render();
@@ -361,14 +423,9 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 }
             };
 
-            const allDeps = new Set<string>();
             chain.filter(b => b.condition).forEach(b => {
-                const kw = new Set(['true','false','null','undefined','in','of','typeof','instanceof']);
-                (b.condition!.match(/\$?[a-zA-Z_][\w$]*(?:\.\$?[a-zA-Z_][\w$]*)*/g) ?? [])
-                    .filter(t => !kw.has(t.split('.')[0]))
-                    .forEach(dep => allDeps.add(dep));
+                subscribeDeps(b.condition!, context, render);
             });
-            allDeps.forEach(dep => subscribeExpr(dep, context, render));
             await render();
             continue;
         }
@@ -444,6 +501,27 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 inputEl.addEventListener('change', () => {
                     if (inputEl.checked) setStateValue(expr, state, applyMods(inputEl.value));
                 });
+            } else if (element.hasAttribute('contenteditable')) {
+                const ceEl = element as HTMLElement;
+                const update = () => {
+                    const val = String(evaluate(expr, state) ?? '');
+                    if (ceEl.innerText !== val) ceEl.innerText = val;
+                };
+                subscribeExpr(expr, context, update);
+                update();
+
+                if (mods.has('debounce')) {
+                    const delayMod = [...mods].find(m => /^\d+$/.test(m));
+                    const delay = delayMod ? parseInt(delayMod) : 300;
+                    let timer: ReturnType<typeof setTimeout>;
+                    ceEl.addEventListener('input', () => {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => setStateValue(expr, state, applyMods(ceEl.innerText)), delay);
+                    });
+                } else {
+                    const inputEvent = mods.has('lazy') ? 'blur' : 'input';
+                    ceEl.addEventListener(inputEvent, () => setStateValue(expr, state, applyMods(ceEl.innerText)));
+                }
             } else {
                 const update = () => { inputEl.value = evaluate(expr, state) ?? ''; };
                 subscribeExpr(expr, context, update);
@@ -683,6 +761,18 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 } else if (propName === 'style') {
                     const staticStyle = element.getAttribute('style') ?? '';
                     const update = () => applyStyle(element, evaluate(expr, state), staticStyle);
+                    subscribeDeps(expr, context, update);
+                    update();
+                } else if (propName.includes('-')) {
+                    // Hyphenated names (data-*, aria-*) are HTML attributes, not DOM properties
+                    const update = () => {
+                        const val = evaluate(expr, state);
+                        if (val === null || val === undefined || val === false) {
+                            element.removeAttribute(propName);
+                        } else {
+                            element.setAttribute(propName, val === true ? '' : String(val));
+                        }
+                    };
                     subscribeDeps(expr, context, update);
                     update();
                 } else {

@@ -58,9 +58,16 @@ export function createReactivityScope() {
 
     const notifyKey = (key: string) => {
         if (_batchDepth > 0) {
-            _batchQueue.set(`${scopeId}:${key}`, () => listeners[key]?.forEach(cb => cb()));
+            // Snapshot at queue time so mutations during batch don't add to the captured set
+            _batchQueue.set(`${scopeId}:${key}`, () => {
+                const cbs = listeners[key] ? [...listeners[key]] : [];
+                cbs.forEach(cb => cb());
+            });
         } else {
-            listeners[key]?.forEach(cb => cb());
+            // Snapshot before iterating: track() may re-subscribe to the same key
+            // during the callback, and Set.forEach visits newly-added entries → infinite loop
+            const cbs = listeners[key] ? [...listeners[key]] : [];
+            cbs.forEach(cb => cb());
         }
     };
 

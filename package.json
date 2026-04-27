@@ -15,12 +15,14 @@
         "dev:ts": "tsc -w",
         "dev:server": "node devserver.js",
         "dev": "concurrently \"npm run dev:ts\" \"npm run dev:server\"",
-        "build": "vite build && esbuild dist/index.js --bundle=false --minify --allow-overwrite --outfile=dist/index.js && tsc -p tsconfig.types.json"
+        "build": "vite build && esbuild dist/index.js --bundle=false --minify --allow-overwrite --outfile=dist/index.js && tsc -p tsconfig.types.json",
+        "test:ssr": "node ssr-test.mjs"
     },
     "devDependencies": {
         "@rollup/plugin-terser": "^1.0.0",
         "concurrently": "^8.2.0",
         "esbuild": "^0.28.0",
+        "happy-dom": "^20.9.0",
         "serve": "^14.2.0",
         "typescript": "^5.0.0",
         "vite": "^8.0.10"
