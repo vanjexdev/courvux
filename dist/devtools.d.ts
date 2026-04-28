@@ -7,16 +7,24 @@ export interface DevToolsComponentInstance {
     subscribe(cb: () => void): () => void;
     children: DevToolsComponentInstance[];
 }
-type DevToolsEvent = 'mount' | 'update' | 'destroy';
+export interface DevToolsStoreEntry {
+    getState(): Record<string, any>;
+    setState(key: string, value: any): void;
+    subscribe(cb: () => void): () => void;
+}
+type DevToolsEvent = 'mount' | 'update' | 'destroy' | 'store-update';
 export interface DevToolsHook {
     instances: DevToolsComponentInstance[];
-    on(event: DevToolsEvent, cb: (instance: DevToolsComponentInstance) => void): () => void;
+    stores: DevToolsStoreEntry[];
+    on(event: DevToolsEvent, cb: (payload: any) => void): () => void;
     /** @internal */
-    _emit(event: DevToolsEvent, instance: DevToolsComponentInstance): void;
+    _emit(event: DevToolsEvent, payload: any): void;
     /** @internal */
     _registerInstance(instance: DevToolsComponentInstance): void;
     /** @internal */
     _unregisterInstance(id: number): void;
+    /** @internal */
+    _registerStore(entry: DevToolsStoreEntry): void;
 }
 declare global {
     interface Window {

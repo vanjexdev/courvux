@@ -3,6 +3,8 @@ export type RouteActivation = {
     destroy: () => void;
     activate?: () => void;
     deactivate?: () => void;
+    beforeLeave?: (to: RouteMatch, next: (redirect?: string) => void) => void;
+    enter?: (from: RouteMatch | null) => void;
 };
 type MountFn = (el: HTMLElement, config: ComponentConfig, route: RouteMatch, layout?: string, childRouter?: Router) => Promise<RouteActivation>;
 export declare function createRouter(routes: RouteConfig[], options?: {

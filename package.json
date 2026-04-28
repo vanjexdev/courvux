@@ -1,11 +1,12 @@
 {
     "name": "courvux",
     "author": "Vanjexdex",
-    "version": "0.1.7",
+    "version": "0.2.0",
     "type": "module",
     "main": "dist/index.js",
     "exports": {
-        ".": "./dist/index.js"
+        ".": "./dist/index.js",
+        "./test-utils": "./dist/test-utils.js"
     },
     "types": "dist/index.d.ts",
     "files": [
@@ -15,8 +16,10 @@
         "dev:ts": "tsc -w",
         "dev:server": "node devserver.js",
         "dev": "concurrently \"npm run dev:ts\" \"npm run dev:server\"",
-        "build": "vite build && esbuild dist/index.js --bundle=false --minify --allow-overwrite --outfile=dist/index.js && tsc -p tsconfig.types.json",
-        "test:ssr": "node ssr-test.mjs"
+        "build": "vite build && esbuild src/test-utils.ts --bundle --format=esm --outfile=dist/test-utils.js && esbuild dist/index.js --bundle=false --minify --allow-overwrite --outfile=dist/index.js && tsc -p tsconfig.types.json",
+        "test:ssr": "node ssr-test.mjs",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "devDependencies": {
         "@rollup/plugin-terser": "^1.0.0",
@@ -25,7 +28,8 @@
         "happy-dom": "^20.9.0",
         "serve": "^14.2.0",
         "typescript": "^5.0.0",
-        "vite": "^8.0.10"
+        "vite": "^8.0.10",
+        "vitest": "^3.2.4"
     },
     "dependencies": {
         "lucide": "^1.11.0"

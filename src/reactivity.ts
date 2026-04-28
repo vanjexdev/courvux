@@ -1,5 +1,22 @@
 const ARRAY_MUTATING = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']);
 
+const _rawSet = new WeakSet<object>();
+export const markRaw = <T extends object>(obj: T): T => { _rawSet.add(obj); return obj; };
+export const isRaw = (obj: object): boolean => _rawSet.has(obj);
+
+const RAW_SYMBOL = Symbol('raw');
+export const toRaw = <T>(obj: T): T => {
+    if (obj === null || typeof obj !== 'object') return obj;
+    return ((obj as any)[RAW_SYMBOL] as T | undefined) ?? obj;
+};
+
+export function readonly<T extends object>(obj: T): Readonly<T> {
+    return new Proxy(obj, {
+        set(_t, key) { console.warn(`[courvux] readonly: cannot set "${String(key)}"`); return true; },
+        deleteProperty(_t, key) { console.warn(`[courvux] readonly: cannot delete "${String(key)}"`); return true; }
+    });
+}
+
 let _batchDepth = 0;
 const _batchQueue = new Map<string, () => void>();
 
@@ -28,7 +45,7 @@ export function batchUpdate(fn: () => void): void {
 }
 
 function makeDeepProxy(val: any, notify: () => void): any {
-    if (val === null || typeof val !== 'object') return val;
+    if (val === null || typeof val !== 'object' || _rawSet.has(val)) return val;
     return new Proxy(val, {
         get(t, k: string) {
             if (Array.isArray(t) && ARRAY_MUTATING.has(k)) {
@@ -39,7 +56,7 @@ function makeDeepProxy(val: any, notify: () => void): any {
                 };
             }
             const v = t[k];
-            if (v !== null && typeof v === 'object') return makeDeepProxy(v, notify);
+            if (v !== null && typeof v === 'object' && !_rawSet.has(v)) return makeDeepProxy(v, notify);
             return v;
         },
         set(t, k: string, v) { t[k] = v; notify(); return true; }
@@ -79,24 +96,29 @@ export function createReactivityScope() {
 
     const createReactiveState = <T extends object>(initialData: T): T => {
         return new Proxy(initialData, {
-            get(target, key: string) {
+            get(target, key) {
+                if (key === RAW_SYMBOL) return initialData;
                 if (typeof key === 'string' && !key.startsWith('$') && _activeEffect) {
                     _activeEffect.push({ sub: subscribe, key });
                 }
                 const val = target[key as keyof T];
-                if (typeof key === 'string' && !key.startsWith('$') && val !== null && typeof val === 'object') {
+                if (typeof key === 'string' && !key.startsWith('$') && val !== null && typeof val === 'object' && !_rawSet.has(val as object)) {
                     return makeDeepProxy(val, () => notifyKey(key));
                 }
                 return val;
             },
             set(target, key: string, value) {
                 if (setInterceptors[key]) { setInterceptors[key](value); return true; }
+                const prev = (target as any)[key];
                 (target as any)[key] = value;
-                notifyKey(key);
+                // Skip notification when primitive value is unchanged
+                if (prev !== value || (value !== null && typeof value === 'object')) notifyKey(key);
                 return true;
             }
         });
     };
 
-    return { subscribe, createReactiveState, registerSetInterceptor };
+    const notifyAll = () => { Object.keys(listeners).forEach(k => notifyKey(k)); };
+
+    return { subscribe, createReactiveState, registerSetInterceptor, notifyAll };
 }

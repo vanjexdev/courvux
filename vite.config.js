@@ -13,5 +13,10 @@ export default {
         minify: 'esbuild',
         outDir: 'dist',
         emptyOutDir: true
-    }
+    },
+    test: {
+        environment: 'happy-dom',
+        globals: true,
+        include: ['src/__tests__/**/*.test.ts'],
+    },
 };

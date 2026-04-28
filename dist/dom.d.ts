@@ -13,10 +13,16 @@ export interface WalkContext {
     provided?: Record<string, any>;
     directives?: Record<string, DirectiveDef | DirectiveShorthand>;
     registerCleanup?: (cleanup: () => void) => void;
+    createChildScope?: (data: Record<string, any>, methods: Record<string, Function>) => {
+        state: any;
+        subscribe: (key: string, cb: Function) => () => void;
+        cleanup: () => void;
+    };
 }
 export declare const resolve: (expr: string, state: any) => any;
 export declare const evaluate: (expr: string, state: any) => any;
 export declare const subscribeExpr: (expr: string, context: WalkContext, cb: Function) => (() => void);
 export declare const subscribeDeps: (expr: string, context: WalkContext, cb: Function) => (() => void);
 export declare const setStateValue: (expr: string, state: any, value: any) => void;
+export declare function injectCloakStyle(): void;
 export declare function walk(el: Node, state: any, context: WalkContext): Promise<void>;

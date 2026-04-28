@@ -2,7 +2,7 @@
 
 Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM updates via Proxy-based reactivity. Ships as a single minified ES module (~10 kB gzip), no build step required.
 
-**Author:** Vanjex — **Version:** 0.1.6
+**Author:** Vanjex — **Version:** 0.2.0
 
 ---
 
@@ -26,6 +26,7 @@ Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM
   - [cv-ref](#cv-ref)
   - [cv-teleport](#cv-teleport)
   - [cv-cloak](#cv-cloak)
+  - [cv-data — Inline reactive scope](#cv-data--inline-reactive-scope)
 - [Components](#components)
   - [Defining components](#defining-components)
   - [Props](#props)
@@ -39,12 +40,17 @@ Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM
   - [$attrs and inheritAttrs](#attrs-and-inheritattrs)
   - [$parent](#parent)
   - [$slots](#slots-1)
+- [autoInit()](#autoinit)
 - [Computed Properties](#computed-properties)
 - [Watchers](#watchers)
 - [Lifecycle Hooks](#lifecycle-hooks)
 - [Instance Properties](#instance-properties)
 - [Custom Directives](#custom-directives)
-- [Transitions — \<cv-transition\>](#transitions--cv-transition)
+- [Transitions — cv-transition](#transitions--cv-transition)
+  - [Inline / bare cv-transition](#inline--bare-cv-transition-built-in)
+  - [Class-based cv-transition (Alpine-compatible)](#class-based-cv-transition-alpine-compatible)
+  - [\<cv-transition\> component](#cv-transition-component)
+- [cv-intersect — Intersection Observer](#cv-intersect--intersection-observer)
 - [Router](#router)
   - [createRouter](#createrouter)
   - [Route options](#route-options)
@@ -175,8 +181,35 @@ app.use(plugin).directive('name', def).mount('#app');
 |---|---|
 | `.use(plugin)` | Install a plugin. Chainable. |
 | `.directive(name, def)` | Register a global custom directive. Chainable. |
+| `.component(name, config)` | Register a global component. Chainable. |
+| `.provide(key, value)` | Provide a value to all descendants via `inject`. Chainable. Also accepts an object: `.provide({ key: val })`. |
+| `.magic(name, fn)` | Register a global `$name` property. `fn` receives the component instance and its return value is assigned as `this.$name` in every component. Chainable. |
 | `.mount(selector)` | Mount on a CSS selector. Returns `Promise<CourvuxApp>`. |
+| `.mountAll(selector?)` | Mount on all matching elements (default `[data-courvux]`). Returns `Promise<CourvuxApp>`. |
+| `.mountEl(el)` | Mount on a specific `HTMLElement`. Returns `Promise<state>`. |
+| `.unmount(selector?)` | Destroy the mounted instance at `selector`, or all instances if omitted. |
+| `.destroy()` | Destroy all instances created by this app. |
 | `.router` | The router instance (useful inside plugins). |
+
+**`app.magic()` example:**
+
+```js
+createApp(config)
+    .magic('fmt', () => ({
+        currency: (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val),
+        date:     (val) => new Date(val).toLocaleDateString(),
+        upper:    (str) => String(str).toUpperCase(),
+    }))
+    .magic('http', () => axios)
+    .mount('#app');
+```
+
+```html
+<!-- available in every component template -->
+<p>{{ $fmt.currency(price) }}</p>
+<p>{{ $fmt.date(createdAt) }}</p>
+<button @click="$http.post('/api/save', data)">Save</button>
+```
 
 ---
 
@@ -192,6 +225,25 @@ app.use(plugin).directive('name', def).mount('#app');
 ```
 
 Full JavaScript expressions are supported (requires no strict CSP — see [Known Limitations](#known-limitations)).
+
+### `html` tagged template helper
+
+When you write a component template inside a JS template literal, the `$` character is consumed by JS before Courvux ever sees it:
+
+```js
+// ❌ JS parses ${{ as a template expression — ReferenceError at runtime
+template: `<button>Price: ${{ price }}</button>`
+
+// ✅ Option 1 — use a regular string (no JS interpolation)
+template: '<button>Price: ${{ price }}</button>'
+
+// ✅ Option 2 — use the html tagged template helper
+import { html } from 'courvux';
+template: html`<button>Price: \${{ price }}</button>`
+//                              ^ backslash escapes $ from JS, html tag restores it
+```
+
+The `html` tag reads the raw string (before JS escape processing), replaces `\$` with `$`, and returns the final string. It does **not** do any HTML escaping.
 
 ### Event binding — `cv:on:event`
 
@@ -349,11 +401,25 @@ Supports object and string syntax. Merged with any static `style` attribute.
 <li cv-for="(value, key) in person">{{ key }}: {{ value }}</li>
 ```
 
-Use `:key` for stable identity. Duplicate keys log a console warning.
+**Keyed reconciliation** — add `:key` for stable identity. When the list changes, Courvux reuses existing DOM nodes for matching keys, only creating/destroying nodes for new/removed keys, and moving nodes for reorders.
 
 ```html
 <li cv-for="user in users" :key="user.id">{{ user.name }}</li>
 ```
+
+Without `:key`, all nodes are destroyed and recreated on every change. With `:key`, only the diff is applied. Duplicate keys log a console warning.
+
+**List transitions with `:key`** — combine with `cv-transition` on the `cv-for` element:
+
+```html
+<ul>
+    <li cv-for="item in items" :key="item.id" cv-transition="fade">
+        {{ item.name }}
+    </li>
+</ul>
+```
+
+Entering nodes get `{name}-enter`, leaving nodes get `{name}-leave`.
 
 ### `cv-if` / `cv-else-if` / `cv-else`
 
@@ -375,11 +441,17 @@ Toggles `display: none` — element stays in the DOM.
 
 ### `cv-html`
 
-Sets `innerHTML` reactively. Use only with trusted content.
+Sets `innerHTML` reactively.
 
 ```html
+<!-- Raw — use only with trusted content -->
 <div cv-html="richContent"></div>
+
+<!-- Sanitized — strips scripts, event handlers, and dangerous elements -->
+<div cv-html.sanitize="userContent"></div>
 ```
+
+`.sanitize` uses the native [Sanitizer API](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Sanitizer_API) when available, and falls back to a DOMParser-based approach that removes `<script>`, `<iframe>`, `onerror`/`onclick` inline handlers, and `javascript:` URLs.
 
 ### `cv-once`
 
@@ -423,15 +495,74 @@ The element is physically appended to `body` (or any CSS selector) but reacts to
 
 Hides content until mounting completes. Prevents a flash of un-rendered template text.
 
-```css
-[cv-cloak] { display: none !important; }
-```
+`createApp()` automatically injects `[cv-cloak]{display:none!important}` — no manual CSS needed.
 
 ```html
 <div id="app" cv-cloak></div>
 <!-- or on individual components -->
 <my-card cv-cloak></my-card>
 ```
+
+The attribute is removed from each element as the framework processes it during the DOM walk.
+
+### `cv-data` — Inline reactive scope
+
+Create a self-contained reactive scope directly on any element — no component registration needed.
+
+```html
+<!-- Inline data object -->
+<div cv-data="{ count: 0, step: 1 }">
+    <button @click="count -= step">−</button>
+    <span>{{ count }}</span>
+    <button @click="count += step">+</button>
+</div>
+```
+
+**Methods** can be included in the same object using shorthand syntax:
+
+```html
+<div cv-data="{ open: false, toggle() { this.open = !this.open } }">
+    <button @click="toggle()">{{ open ? 'Close' : 'Open' }}</button>
+    <div cv-show="open">Panel content</div>
+</div>
+```
+
+**Nested scopes** — a child `cv-data` inherits all keys from the parent scope. Child keys shadow parent keys of the same name, but do not mutate the parent.
+
+```html
+<div cv-data="{ user: 'Alice', tags: ['admin', 'dev'] }">
+    <p>Outer: {{ user }}</p>
+    <div cv-data="{ role: 'Editor', idx: 0 }">
+        <!-- reads parent's user + tags -->
+        <p>Inner: {{ role }} — user from parent: {{ user }}</p>
+        <p>Tag: {{ tags[idx] }}</p>
+        <button @click="idx = (idx + 1) % tags.length">Next</button>
+    </div>
+</div>
+```
+
+**Named component reference** — use a registered component name as the value to reuse a component's `data` and `methods` without mounting a full component:
+
+```html
+<div cv-data="my-counter">
+    <button @click="dec()">−</button>
+    <span>{{ n }}</span>
+    <button @click="inc()">+</button>
+</div>
+```
+
+```js
+// Registered globally
+app.component('my-counter', {
+    data: { n: 0 },
+    methods: {
+        inc() { this.n++; },
+        dec() { this.n--; }
+    }
+});
+```
+
+> `cv-data` scopes are lighter than components — no lifecycle hooks, no slots, no emits. Use components when you need those features.
 
 ---
 
@@ -844,6 +975,60 @@ All hooks have `this` bound to the reactive component state.
 
 ---
 
+## `autoInit()`
+
+Initialize `cv-data` elements automatically on page load — no `createApp()` call required. Ideal for adding interactivity to server-rendered HTML.
+
+```js
+import { autoInit } from 'courvux';
+
+autoInit(); // scans [cv-data] on DOMContentLoaded
+```
+
+```html
+<!-- No JavaScript setup beyond the import -->
+<div cv-data="{ count: 0, inc() { this.count++ } }">
+    <button @click="inc()">Clicks: {{ count }}</button>
+</div>
+
+<div cv-data="{ open: false }">
+    <button @click="open = !open">Toggle</button>
+    <p cv-show="open">Visible!</p>
+</div>
+```
+
+**Options:**
+
+```js
+autoInit({
+    components: {
+        'my-card': MyCardComponent,
+    },
+    directives: {
+        tooltip: myTooltipDirective,
+    },
+    globalProperties: {
+        appName: 'My Site',
+    },
+});
+```
+
+**Named component shorthand:**
+
+```js
+autoInit({ components: { dropdown: DropdownDef } });
+```
+
+```html
+<div cv-data="dropdown">
+    <!-- uses DropdownDef data + methods -->
+</div>
+```
+
+`autoInit` finds all top-level `[cv-data]` elements — elements nested inside another `[cv-data]` are handled by their outer scope's walk, not re-mounted by `autoInit`.
+
+---
+
 ## Instance Properties
 
 These are available as `this.x` inside any method, hook, computed getter/setter, or watcher, and as `{{ $x }}` in templates.
@@ -852,16 +1037,66 @@ These are available as `this.x` inside any method, hook, computed getter/setter,
 |---|---|
 | `this.$el` | The root DOM element of the component |
 | `this.$refs` | Object of refs collected via `cv-ref` |
-| `this.$route` | Current route — `{ path, params, meta }` |
+| `this.$route` | Current route — `{ path, params, query, meta }` |
 | `this.$router` | The router instance — call `this.$router.navigate('/path')` |
 | `this.$store` | The global store |
 | `this.$attrs` | Non-prop, non-event attributes passed to this component |
 | `this.$slots` | `{ slotName: true }` for each slot provided by the parent |
 | `this.$parent` | The parent component's reactive state |
-| `this.$emit(event, ...args)` | Emit an event to the parent |
+| `this.$emit(event, ...args)` | Emit an event to the parent component |
+| `this.$dispatch(event, detail?, opts?)` | Fire a bubbling `CustomEvent` from `$el` — any DOM ancestor can listen with `@event` |
 | `this.$watch(key, handler, opts?)` | Register a watcher programmatically |
+| `this.$watchEffect(fn)` | Auto-tracked side effect, stopped on destroy |
+| `this.$forceUpdate()` | Re-notify all reactive keys — force full DOM refresh |
+| `this.$addCleanup(fn)` | Register a teardown function run on component destroy |
 | `this.$batch(fn)` | Group multiple state mutations into one DOM flush |
 | `this.$nextTick(cb?)` | Run a callback after the next DOM update |
+
+**`$nextTick` example:**
+
+```js
+methods: {
+    addItem() {
+        this.items.push({ id: Date.now(), name: 'New' });
+        // DOM is not yet updated here — wait for the next flush
+        this.$nextTick(() => {
+            this.$refs.list.lastElementChild?.scrollIntoView();
+        });
+    }
+}
+```
+
+`$nextTick` returns a `Promise` if no callback is given:
+
+```js
+async save() {
+    this.saved = true;
+    await this.$nextTick();
+    console.log('DOM updated, saved badge is visible');
+}
+```
+
+---
+
+**`$dispatch` example:**
+
+```js
+// child component
+methods: {
+    select(item) {
+        this.$dispatch('item-selected', { id: item.id, name: item.name });
+    }
+}
+```
+
+```html
+<!-- parent template — catches the bubbling event -->
+<div @item-selected="onSelected">
+    <product-list></product-list>
+</div>
+```
+
+The event bubbles from the child component's `$el` up through the DOM tree. Any ancestor element with an `@event` listener will receive it.
 
 ---
 
@@ -932,9 +1167,75 @@ app.directive('tooltip', {
 
 ---
 
-## Transitions — `<cv-transition>`
+## Transitions — `cv-transition`
 
-Animate elements entering and leaving with CSS animations.
+Courvux supports two styles of enter/leave transitions, both tied to `cv-show`.
+
+---
+
+### Inline / bare `cv-transition` (built-in)
+
+Add `cv-transition` directly on any `cv-show` element for instant fade/scale animations — no CSS needed.
+
+```html
+<!-- Fade only (default) -->
+<div cv-show="open" cv-transition>Panel</div>
+
+<!-- Fade + scale -->
+<div cv-show="open" cv-transition.scale>Panel</div>
+
+<!-- Custom scale origin (0–100) and duration (ms) -->
+<div cv-show="open" cv-transition.scale.90.duration.300>Panel</div>
+
+<!-- Scale without fade -->
+<div cv-show="open" cv-transition.scale.opacity>Panel</div>
+```
+
+Modifiers:
+
+| Modifier | Effect |
+|---|---|
+| _(none)_ | Fade in/out |
+| `.scale` | Fade + scale (default origin 0.9) |
+| `.scale.N` | Custom scale origin — e.g. `.scale.85` = `scale(0.85)` |
+| `.duration.N` | Animation duration in ms — e.g. `.duration.300` |
+
+---
+
+### Class-based `cv-transition` (Alpine-compatible)
+
+Attach fine-grained CSS class sets to control every phase of the transition.
+
+```html
+<div
+    cv-show="open"
+    cv-transition:enter="transition ease-out duration-300"
+    cv-transition:enter-start="opacity-0 scale-95"
+    cv-transition:enter-end="opacity-100 scale-100"
+    cv-transition:leave="transition ease-in duration-200"
+    cv-transition:leave-start="opacity-100 scale-100"
+    cv-transition:leave-end="opacity-0 scale-95"
+>
+    Panel
+</div>
+```
+
+Class timeline per phase:
+
+| Phase | Classes applied | Then removed |
+|---|---|---|
+| Enter | `:enter` + `:enter-start` | `:enter-start` → `:enter-end` → wait → remove all |
+| Leave | `:leave` + `:leave-start` | `:leave-start` → `:leave-end` → wait → hide + remove all |
+
+Each step is separated by a double `requestAnimationFrame` to guarantee the browser paints the start state before the transition begins.
+
+Works with any CSS utility framework (Tailwind, UnoCSS, etc.).
+
+---
+
+### `<cv-transition>` component
+
+Wraps an element and controls visibility via a `:show` prop. Uses the built-in named transitions.
 
 ```html
 <button @click="show = !show">Toggle</button>
@@ -944,7 +1245,7 @@ Animate elements entering and leaving with CSS animations.
 </cv-transition>
 ```
 
-**Built-in transitions**: `fade`, `slide-down`, `slide-up`.
+**Built-in names**: `fade`, `slide-down`, `slide-up`.
 
 CSS classes injected:
 - `{name}-enter` — applied during the enter phase, removed when done
@@ -968,6 +1269,62 @@ CSS classes injected:
     <div class="modal">...</div>
 </cv-transition>
 ```
+
+---
+
+## `cv-intersect` — Intersection Observer
+
+Runs an expression when an element enters or leaves the viewport. Backed by the native `IntersectionObserver` API — no-op if unsupported.
+
+```html
+<!-- Fire when element scrolls into view -->
+<div cv-intersect="loadMore()">...</div>
+
+<!-- Separate enter / leave handlers -->
+<div
+    cv-intersect:enter="onEnter()"
+    cv-intersect:leave="onLeave()"
+>...</div>
+
+<!-- Only fire once, then stop observing -->
+<div cv-intersect.once="trackImpression()">...</div>
+```
+
+**Threshold modifiers** — how much of the element must be visible:
+
+```html
+<!-- 50% visible -->
+<div cv-intersect.half="handler()">...</div>
+
+<!-- 100% visible -->
+<div cv-intersect.full="handler()">...</div>
+
+<!-- Arbitrary % (0–100) -->
+<div cv-intersect.threshold-75="handler()">...</div>
+```
+
+**Margin modifier** — expand or shrink the detection zone:
+
+```html
+<!-- Trigger 200px before the element reaches the viewport -->
+<div cv-intersect.margin-200="prefetch()">...</div>
+```
+
+**Combining modifiers**:
+
+```html
+<div cv-intersect.once.half.margin-100="animate()">...</div>
+```
+
+**Modifier reference**:
+
+| Modifier | Description |
+|---|---|
+| `.once` | Disconnect observer after first intersection |
+| `.half` | threshold = 0.5 (50% visible) |
+| `.full` | threshold = 1.0 (100% visible) |
+| `.threshold-N` | threshold = N / 100 |
+| `.margin-N` | `rootMargin` = `Npx` (positive = expand zone) |
 
 ---
 
@@ -1024,7 +1381,20 @@ Navigation links:
 { path: '/user/:id', component: { template: `<p>ID: {{ $route.params.id }}</p>` } }
 ```
 
-`$route.params`, `$route.path`, and `$route.meta` are available in any component rendered by the router.
+`$route` is available in any component rendered by the router:
+
+| Property | Description |
+|---|---|
+| `$route.path` | Current pathname, e.g. `/user/42` |
+| `$route.params` | Path params — `{ id: '42' }` |
+| `$route.query` | Query string as a plain object — `{ page: '2', filter: 'active' }` |
+| `$route.meta` | Route-level metadata object |
+
+```html
+<!-- template -->
+<p>Page: {{ $route.query.page ?? '1' }}</p>
+<p>Filter: {{ $route.query.filter ?? 'all' }}</p>
+```
 
 ### Redirects
 
@@ -1194,10 +1564,29 @@ createRouter(routes, {
 
 ```js
 methods: {
-    goHome()      { this.$router.navigate('/'); },
-    goToUser(id)  { this.$router.navigate(`/user/${id}`); }
+    goHome()         { this.$router.navigate('/'); },
+    goToUser(id)     { this.$router.navigate(`/user/${id}`); },
+    goBack()         { this.$router.back(); },
+
+    // Navigate with query string
+    search(term)     {
+        this.$router.navigate('/results', { query: { q: term, page: '1' } });
+    },
+    // → /results?q=term&page=1
+
+    // Replace (no history entry)
+    redirect(path)   {
+        this.$router.replace(path, { query: { from: 'redirect' } });
+    },
 }
 ```
+
+| Method | Description |
+|---|---|
+| `navigate(path, opts?)` | Push a new history entry. `opts.query` is serialized as `?key=value`. |
+| `replace(path, opts?)` | Replace current history entry (no back-button entry). |
+| `back()` | Go to previous history entry. |
+| `forward()` | Go to next history entry. |
 
 ---
 
@@ -1660,5 +2049,6 @@ The dev server (`devserver.js`) serves:
 | Item | Description |
 |---|---|
 | CSP / `new Function` | Expression evaluation and inline event handlers use `new Function`. Falls back to a safe evaluator (property access + literals only) under strict CSP — complex JS expressions in templates won't work. |
-| `cv-for` re-render cost | Any change to a tracked array/object triggers a full cv-for re-render (no key-based diffing). Nested property mutations (`items[0].name = 'x'`) do trigger correctly via deep proxy — but the whole list re-renders. |
+| `cv-for` without `:key` | Without a `:key`, any change to a tracked array/object destroys and recreates all list nodes. Use `:key="item.id"` to enable keyed reconciliation — only changed/added/removed nodes are touched. |
+| `cv-for` array mutation | Courvux detects array reassignment (`items = newArray`) and does a full keyed diff. Direct array mutations like `items.push(x)` or `items[0].name = 'x'` also trigger reactively via the deep Proxy, but the diff still runs over the full list. Intercepting specific mutations (push/splice) for O(1) DOM ops is not yet implemented. |
 | SSR | Not supported. Courvux is browser-only. |

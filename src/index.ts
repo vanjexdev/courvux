@@ -1,17 +1,25 @@
-import { AppConfig, ComponentConfig, RouteMatch, Router, WatcherOptions, DirectiveDef, DirectiveShorthand, ComputedDef } from './types.js';
-import { createReactivityScope, batchUpdate, collectDeps } from './reactivity.js';
-import { walk, WalkContext, evaluate, subscribeExpr, subscribeDeps, setStateValue } from './dom.js';
+import { AppConfig, ComponentConfig, RouteMatch, Router, WatcherOptions, DirectiveDef, DirectiveShorthand, ComputedDef, LazyComponent } from './types.js';
+import { createReactivityScope, batchUpdate, collectDeps, markRaw } from './reactivity.js';
+import { walk, WalkContext, evaluate, subscribeExpr, subscribeDeps, setStateValue, injectCloakStyle } from './dom.js';
 import { setupRouterView, RouteActivation } from './router.js';
-import { setupDevTools, nextDevToolsId } from './devtools.js';
+import { setupDevTools, nextDevToolsId, DevToolsStoreEntry } from './devtools.js';
+import { mountDevOverlay } from './overlay.js';
 import { SSR_ATTR } from './ssr.js';
+import { subscribeToStore } from './store.js';
 
 export { createRouter } from './router.js';
 export { createStore } from './store.js';
-export { batchUpdate } from './reactivity.js';
+export { batchUpdate, markRaw, toRaw, readonly } from './reactivity.js';
+export { createEventBus } from './events.js';
+export type { EventBus } from './events.js';
+export { cvStorage, cvListener, cvMediaQuery, cvFetch, cvDebounce, cvThrottle } from './composables.js';
+export type { FetchState, FetchOptions } from './composables.js';
 export { setupDevTools } from './devtools.js';
+export { mountDevOverlay } from './overlay.js';
 export { renderToString, SSR_ATTR } from './ssr.js';
-export type { DevToolsHook, DevToolsComponentInstance } from './devtools.js';
+export type { DevToolsHook, DevToolsComponentInstance, DevToolsStoreEntry } from './devtools.js';
 export type { AppConfig, ComponentConfig, RouteConfig, Router, RouteMatch, NavigationGuard, ScrollBehavior, WatcherEntry, WatcherOptions, DirectiveBinding, DirectiveDef, DirectiveShorthand, LazyComponent, ComputedDef } from './types.js';
+export type { RouteActivation } from './router.js';
 export type { StoreConfig } from './store.js';
 
 export const nextTick = (cb?: () => void): Promise<void> =>
@@ -20,6 +28,9 @@ export const nextTick = (cb?: () => void): Promise<void> =>
 type AppContext = Omit<WalkContext, 'subscribe'> & {
     currentRoute?: RouteMatch;
     baseUrl?: string;
+    errorHandler?: (err: Error, instance: any, componentName: string) => void;
+    globalProperties?: Record<string, any>;
+    magics?: Record<string, (instance: any) => any>;
 };
 
 type MountResult = {
@@ -27,6 +38,8 @@ type MountResult = {
     destroy: () => void;
     activate: () => void;
     deactivate: () => void;
+    beforeLeave?: (to: RouteMatch, next: (redirect?: string) => void) => void;
+    enter?: (from: RouteMatch | null) => void;
 };
 
 function parseVSlot(expr: string, scope: Record<string, any>): Record<string, any> {
@@ -44,8 +57,19 @@ const tryClone = (val: any): any => {
 };
 
 async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppContext): Promise<MountResult> {
-    // Always inject template so walk() can find {{ }} expressions and wire reactivity.
-    // SSR provides the initial fast paint; client takes over completely once JS loads.
+    const refs: Record<string, any> = {};
+    const { subscribe, createReactiveState, registerSetInterceptor, notifyAll } = createReactivityScope();
+
+    // Resolve data — if async, show loadingTemplate while awaiting
+    let rawData: Record<string, any>;
+    if (typeof config.data === 'function') {
+        if (config.loadingTemplate) el.innerHTML = config.loadingTemplate;
+        rawData = await (config.data as () => Record<string, any> | Promise<Record<string, any>>)();
+    } else {
+        rawData = config.data ?? {};
+    }
+
+    // Inject template (replaces loadingTemplate if shown)
     if (config.templateUrl) {
         const url = appContext.baseUrl
             ? new URL(config.templateUrl, appContext.baseUrl).href
@@ -61,9 +85,6 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
     el.removeAttribute(SSR_ATTR);
     el.querySelector(`[${SSR_ATTR}]`)?.removeAttribute(SSR_ATTR);
 
-    const refs: Record<string, any> = {};
-    const { subscribe, createReactiveState, registerSetInterceptor } = createReactivityScope();
-
     // inject — pull provided values into local state
     const injected: Record<string, any> = {};
     if (config.inject && appContext.provided) {
@@ -78,7 +99,8 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
     }
 
     const state = createReactiveState({
-        ...config.data,
+        ...(appContext.globalProperties ?? {}),
+        ...rawData,
         ...injected,
         ...config.methods,
         $refs: refs,
@@ -108,6 +130,48 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
 
     // $nextTick — espera el siguiente tick del microtask queue
     (state as any).$nextTick = (cb?: () => void): Promise<void> => nextTick(cb);
+
+    // $dispatch — fire a custom DOM event that bubbles up from $el
+    (state as any).$dispatch = (eventName: string, detail?: any, options?: CustomEventInit) => {
+        el.dispatchEvent(new CustomEvent(eventName, { bubbles: true, composed: true, ...(options ?? {}), detail }));
+    };
+
+    // magics — inject app-level magic properties registered via app.magic()
+    if (appContext.magics) {
+        Object.entries(appContext.magics).forEach(([key, fn]) => {
+            (state as any)[key] = fn(state);
+        });
+    }
+
+    // $forceUpdate — re-notifies all reactive keys, forcing every DOM subscription to re-run
+    (state as any).$forceUpdate = () => notifyAll();
+
+    // $watchEffect — auto-dep-tracking side effect; auto-stopped on destroy
+    const watchEffectStops: Array<() => void> = [];
+    (state as any).$watchEffect = (fn: () => void): (() => void) => {
+        let unsubs: Array<() => void> = [];
+        const run = () => {
+            unsubs.forEach(u => u());
+            unsubs = [];
+            const rawDeps = collectDeps(() => { try { fn(); } catch { /* */ } });
+            const seen = new Map<Function, Set<string>>();
+            for (const { sub, key: k } of rawDeps) {
+                if (!seen.has(sub)) seen.set(sub, new Set());
+                if (seen.get(sub)!.has(k)) continue;
+                seen.get(sub)!.add(k);
+                unsubs.push(sub(k, run));
+            }
+        };
+        run();
+        const stop = () => {
+            unsubs.forEach(u => u());
+            unsubs = [];
+            const idx = watchEffectStops.indexOf(stop);
+            if (idx > -1) watchEffectStops.splice(idx, 1);
+        };
+        watchEffectStops.push(stop);
+        return stop;
+    };
 
     // Computed — auto-tracks deps via _activeEffect; soporta { get, set? }
     const computedCleanups: Array<() => void> = [];
@@ -178,6 +242,48 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
     };
     walkContext.mountElement = createMountElement(walkContext);
 
+    // createChildScope — factory for cv-data inline scopes; child keys get own reactivity,
+    // parent keys delegate to current component's subscribe (live inheritance)
+    walkContext.createChildScope = (inlineData, inlineMethods) => {
+        const dataKeys = new Set(Object.keys(inlineData));
+        const methodKeys = new Set(Object.keys(inlineMethods));
+        const { subscribe: childSub, createReactiveState: childCreate } = createReactivityScope();
+        const childReactive = childCreate(inlineData);
+
+        let mergedState: any;
+        mergedState = new Proxy({} as any, {
+            get(_t, key: string) {
+                if (typeof key !== 'string') return (state as any)[key];
+                if (dataKeys.has(key)) return (childReactive as any)[key];
+                if (methodKeys.has(key)) return (inlineMethods[key] as Function).bind(mergedState);
+                return (state as any)[key];
+            },
+            set(_t, key: string, value) {
+                if (typeof key !== 'string') return false;
+                if (dataKeys.has(key)) { (childReactive as any)[key] = value; return true; }
+                (state as any)[key] = value;
+                return true;
+            },
+            has(_t, key) {
+                return dataKeys.has(key as string) || methodKeys.has(key as string) || key in (state as any);
+            },
+            ownKeys() {
+                return [...dataKeys, ...methodKeys, ...Object.keys(state as any)];
+            },
+            getOwnPropertyDescriptor(_t, key) {
+                const has = dataKeys.has(key as string) || methodKeys.has(key as string) || key in (state as any);
+                return has ? { configurable: true, enumerable: true, writable: true } : undefined;
+            },
+        });
+
+        const mergedSub = (key: string, cb: Function) => {
+            if (dataKeys.has(key)) return childSub(key, cb);
+            return domSubscribe(key, cb);
+        };
+
+        return { state: mergedState, subscribe: mergedSub, cleanup: () => {} };
+    };
+
     // mountDynamic — gestiona ciclo de vida de <component :is="...">
     walkContext.mountDynamic = async (anchor, compExpr, originalEl, parentState, parentContext) => {
         let currentEl: HTMLElement | null = null;
@@ -234,7 +340,7 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
                 data: { ...config.data, ...props },
                 methods: {
                     ...config.methods,
-                    $emit(_n: string, ..._a: any[]) { emitHandlers[_n]?.(..._a); }
+                    $emit(_n: string, ..._a: any[]) { validateEmit(config, _n, _a); emitHandlers[_n]?.(..._a); }
                 }
             };
             const localCtx: AppContext = { ...walkContext, components: { ...walkContext.components, ...config.components } };
@@ -252,16 +358,39 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
 
     const cleanups: Array<() => void> = [];
 
+    // $addCleanup — register a teardown function that runs when component is destroyed
+    (state as any).$addCleanup = (fn: () => void) => { cleanups.push(fn); };
+
+    // Wrap subscribe for onBeforeUpdate/onUpdated lifecycle hooks on DOM subscriptions
+    let _updatePending = false;
+    const domSubscribe = (key: string, cb: Function): (() => void) => {
+        if (!config.onBeforeUpdate && !config.onUpdated) return subscribe(key, cb);
+        return subscribe(key, () => {
+            if (!_updatePending) {
+                _updatePending = true;
+                config.onBeforeUpdate?.call(state);
+                Promise.resolve().then(() => {
+                    _updatePending = false;
+                    config.onUpdated?.call(state);
+                });
+            }
+            cb();
+        });
+    };
+
     // error boundary — onError atrapa errores en este componente y sus hijos
     try {
         config.onBeforeMount?.call(state);
-        await walk(el, state, { subscribe, refs, ...walkContext, registerCleanup: (c) => cleanups.push(c) });
+        await walk(el, state, { subscribe: domSubscribe, refs, ...walkContext, registerCleanup: (c) => cleanups.push(c) });
         el.removeAttribute('cv-cloak');
         config.onMount?.call(state);
     } catch (err) {
         if (config.onError) {
             el.removeAttribute('cv-cloak');
             config.onError.call(state, err as Error);
+        } else if (appContext.errorHandler) {
+            el.removeAttribute('cv-cloak');
+            appContext.errorHandler(err as Error, state, config.name ?? el.tagName.toLowerCase());
         } else {
             throw err;
         }
@@ -308,12 +437,27 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
             config.onBeforeUnmount?.call(state);
             computedCleanups.forEach(c => c());
             watcherUnsubs.forEach(u => u());
+            watchEffectStops.forEach(s => s());
             cleanups.forEach(c => c());
             config.onDestroy?.call(state);
         },
         activate: () => { config.onActivated?.call(state); },
         deactivate: () => { config.onDeactivated?.call(state); },
+        beforeLeave: config.onBeforeRouteLeave
+            ? (to: RouteMatch, next: (redirect?: string) => void) => config.onBeforeRouteLeave!.call(state, to, next)
+            : undefined,
+        enter: config.onBeforeRouteEnter
+            ? (from: RouteMatch | null) => config.onBeforeRouteEnter!.call(state, from)
+            : undefined,
     };
+}
+
+function validateEmit(config: ComponentConfig, eventName: string, args: any[]): void {
+    if (!config.emits || Array.isArray(config.emits)) return;
+    const validator = (config.emits as Record<string, ((...a: any[]) => boolean) | null>)[eventName];
+    if (typeof validator === 'function' && !validator(...args)) {
+        console.warn(`[courvux] emit "${eventName}": validator returned false`);
+    }
 }
 
 function createMountElement(appContext: AppContext): AppContext['mountElement'] {
@@ -427,6 +571,7 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
             methods: {
                 ...componentConfig.methods,
                 $emit(_eventName: string, ..._args: any[]) {
+                    validateEmit(componentConfig, _eventName, _args);
                     emitHandlers[_eventName]?.(..._args);
                 }
             }
@@ -447,24 +592,165 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
     };
 }
 
+export interface ComponentThis {
+    $el: HTMLElement;
+    $refs: Record<string, Element | Record<string, any>>;
+    $router: Router;
+    $store: Record<string, any>;
+    $route: RouteMatch;
+    $slots: Record<string, boolean>;
+    $attrs: Record<string, string>;
+    $parent: Record<string, any>;
+    $emit(event: string, ...args: any[]): void;
+    $dispatch(event: string, detail?: any, options?: CustomEventInit): void;
+    $watch(key: string, handler: (newVal: any, oldVal: any) => void, options?: { immediate?: boolean; deep?: boolean }): () => void;
+    $watchEffect(fn: () => void): () => void;
+    $forceUpdate(): void;
+    $addCleanup(fn: () => void): void;
+    $batch(fn: () => void): void;
+    $nextTick(cb?: () => void): Promise<void>;
+    [key: string]: any;
+}
+
+type Inst<D, M> = D & M & ComponentThis;
+type ComputedFn<D, M> = ((this: Inst<D, M>) => any) | { get(this: Inst<D, M>): any; set?(this: Inst<D, M>, val: any): void };
+type WatchFn<D, M> = ((this: Inst<D, M>, n: any, o: any) => void) | { handler(this: Inst<D, M>, n: any, o: any): void; immediate?: boolean; deep?: boolean };
+
+export function defineComponent<
+    D extends Record<string, any> = Record<string, never>,
+    M extends Record<string, Function> = Record<string, never>
+>(config: {
+    name?: string;
+    template?: string;
+    templateUrl?: string;
+    data?: D | (() => D | Promise<D>);
+    methods?: M & ThisType<Inst<D, M>>;
+    computed?: Record<string, ComputedFn<D, M>>;
+    watch?: Record<string, WatchFn<D, M>>;
+    emits?: string[] | Record<string, ((...args: any[]) => boolean) | null>;
+    components?: Record<string, ComponentConfig>;
+    provide?: Record<string, any> | ((this: Inst<D, M>) => Record<string, any>);
+    inject?: string[] | Record<string, string>;
+    inheritAttrs?: boolean;
+    directives?: Record<string, DirectiveDef | DirectiveShorthand>;
+    onBeforeMount?(this: Inst<D, M>): void;
+    onMount?(this: Inst<D, M>): void;
+    onBeforeUpdate?(this: Inst<D, M>): void;
+    onUpdated?(this: Inst<D, M>): void;
+    onBeforeUnmount?(this: Inst<D, M>): void;
+    onDestroy?(this: Inst<D, M>): void;
+    onActivated?(this: Inst<D, M>): void;
+    onDeactivated?(this: Inst<D, M>): void;
+    onError?(this: Inst<D, M>, err: Error): void;
+    onBeforeRouteLeave?(this: Inst<D, M>, to: RouteMatch, next: (redirect?: string) => void): void;
+    onBeforeRouteEnter?(this: Inst<D, M>, from: RouteMatch | null): void;
+}): ComponentConfig {
+    return config as unknown as ComponentConfig;
+}
+
+export interface AsyncComponentOptions {
+    loader: LazyComponent;
+    loadingTemplate?: string;
+    errorTemplate?: string;
+    timeout?: number;
+    onError?: (err: Error, retry: () => void, fail: (e: Error) => void, attempts: number) => void;
+}
+
+export function defineAsyncComponent(options: LazyComponent | AsyncComponentOptions): LazyComponent {
+    if (typeof options === 'function') return options;
+    const { loader, timeout, onError } = options;
+    let attempts = 0;
+    const wrappedLoader: LazyComponent = () => new Promise((resolve, reject) => {
+        attempts++;
+        let settled = false;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const settle = (fn: typeof resolve | typeof reject, val: any) => {
+            if (settled) return; settled = true; clearTimeout(timer); fn(val as any);
+        };
+        if (timeout) timer = setTimeout(() => settle(reject, new Error(`[courvux] Async component timed out after ${timeout}ms`)), timeout);
+        loader().then(
+            mod => settle(resolve, mod),
+            err => {
+                if (!onError) { settle(reject, err); return; }
+                onError(err, () => wrappedLoader().then(m => settle(resolve, m)).catch(e => settle(reject, e)), e => settle(reject, e), attempts);
+            }
+        );
+    });
+    (wrappedLoader as any).__asyncOptions = options;
+    return wrappedLoader;
+}
+
 export interface CourvuxPlugin {
     install(app: CourvuxApp): void;
+}
+
+// createPlugin — standardized plugin factory
+// Module augmentation for globalProperties (add to your project's .d.ts):
+// declare module 'courvux' { interface ComponentThis { $http: typeof axios } }
+export function createPlugin(options: {
+    components?: Record<string, ComponentConfig>;
+    directives?: Record<string, DirectiveDef | DirectiveShorthand>;
+    provide?: Record<string, any>;
+    globalProperties?: Record<string, any>;
+    install?: (app: CourvuxApp) => void;
+}): CourvuxPlugin {
+    return {
+        install(app: CourvuxApp) {
+            if (options.components) Object.entries(options.components).forEach(([n, c]) => app.component(n, c));
+            if (options.directives) Object.entries(options.directives).forEach(([n, d]) => app.directive(n, d));
+            if (options.provide) app.provide(options.provide);
+            options.install?.(app);
+        }
+    };
 }
 
 export interface CourvuxApp {
     use(plugin: CourvuxPlugin): CourvuxApp;
     directive(name: string, def: DirectiveDef | DirectiveShorthand): CourvuxApp;
+    component(name: string, config: ComponentConfig): CourvuxApp;
+    provide(key: string, value: any): CourvuxApp;
+    provide(values: Record<string, any>): CourvuxApp;
+    magic(name: string, fn: (instance: any) => any): CourvuxApp;
     mount(selector: string): Promise<CourvuxApp>;
     mountAll(selector?: string): Promise<CourvuxApp>;
+    mountEl(el: HTMLElement): Promise<any>;
+    unmount(selector?: string): CourvuxApp;
     destroy(): void;
     router?: Router;
 }
 
 export function createApp(config: AppConfig): CourvuxApp {
-    if (typeof window !== 'undefined') setupDevTools();
+    injectCloakStyle();
+    const devtools = typeof window !== 'undefined' ? setupDevTools() : undefined;
     const plugins: CourvuxPlugin[] = [];
     const directives: Record<string, DirectiveDef | DirectiveShorthand> = { ...config.directives };
+    const globalComponents: Record<string, ComponentConfig> = { ...(config.components ?? {}) };
     const destroyFns: Array<() => void> = [];
+    const mountRegistry = new Map<HTMLElement, () => void>();
+    const globalProvided: Record<string, any> = {};
+    const magics = new Map<string, (instance: any) => any>();
+
+    // Dev overlay — mounted before store/app so it's ready when events fire
+    if (config.debug && devtools) mountDevOverlay(devtools);
+
+    // Register store in devtools if present
+    if (devtools && config.store) {
+        const store = config.store as Record<string, any>;
+        const storeKeys = Object.keys(store).filter(k => typeof store[k] !== 'function');
+        const storeEntry: DevToolsStoreEntry = {
+            getState() {
+                const snap: Record<string, any> = {};
+                storeKeys.forEach(k => { try { snap[k] = store[k]; } catch { /* */ } });
+                return snap;
+            },
+            setState(key, value) { store[key] = value; },
+            subscribe(cb) {
+                const unsubs = storeKeys.map(k => { try { return subscribeToStore(store, k, cb); } catch { return () => {}; } });
+                return () => unsubs.forEach(u => u());
+            },
+        };
+        devtools._registerStore(storeEntry);
+    }
 
     const app: CourvuxApp = {
         router: config.router,
@@ -479,15 +765,52 @@ export function createApp(config: AppConfig): CourvuxApp {
             directives[name] = def;
             return app;
         },
+        component(name: string, cfg: ComponentConfig) {
+            globalComponents[name] = cfg;
+            return app;
+        },
+        provide(keyOrObj: string | Record<string, any>, value?: any): CourvuxApp {
+            if (typeof keyOrObj === 'string') {
+                globalProvided[keyOrObj] = value;
+            } else {
+                Object.assign(globalProvided, keyOrObj);
+            }
+            return app;
+        },
+        magic(name: string, fn: (instance: any) => any): CourvuxApp {
+            magics.set(`$${name}`, fn);
+            return app;
+        },
         mount: async (selector: string) => { await _mount(selector); return app; },
         mountAll: async (selector = '[data-courvux]') => {
             const els = Array.from(document.querySelectorAll<HTMLElement>(selector));
             await Promise.all(els.map(el => _mountEl(el)));
             return app;
         },
+        mountEl: async (el: HTMLElement) => _mountEl(el),
+        unmount(selector?: string) {
+            if (!selector) {
+                destroyFns.forEach(fn => fn());
+                destroyFns.length = 0;
+                mountRegistry.clear();
+            } else {
+                const el = document.querySelector<HTMLElement>(selector);
+                if (el) {
+                    const destroy = mountRegistry.get(el);
+                    if (destroy) {
+                        destroy();
+                        mountRegistry.delete(el);
+                        const idx = destroyFns.indexOf(destroy);
+                        if (idx > -1) destroyFns.splice(idx, 1);
+                    }
+                }
+            }
+            return app;
+        },
         destroy() {
             destroyFns.forEach(fn => fn());
             destroyFns.length = 0;
+            mountRegistry.clear();
         },
     };
 
@@ -495,11 +818,15 @@ export function createApp(config: AppConfig): CourvuxApp {
         const baseUrl = new URL('.', document.baseURI).href;
 
         const appContext: AppContext = {
-            components: config.components,
+            components: globalComponents,
             router: config.router,
             store: config.store,
             directives,
             baseUrl,
+            provided: { ...globalProvided },
+            errorHandler: config.errorHandler,
+            globalProperties: config.globalProperties,
+            magics: magics.size ? Object.fromEntries(magics) : undefined,
         };
 
         appContext.mountElement = createMountElement(appContext);
@@ -588,6 +915,7 @@ export function createApp(config: AppConfig): CourvuxApp {
 
         const result = await mount(root, config, appContext);
         destroyFns.push(result.destroy);
+        mountRegistry.set(root, result.destroy);
         return result.state;
     };
 
@@ -598,4 +926,83 @@ export function createApp(config: AppConfig): CourvuxApp {
     };
 
     return app;
+}
+
+/**
+ * Tagged template helper for writing component templates in JS template literals.
+ * Converts \${{ expr }} → ${{ expr }} so Courvux interpolation survives JS parsing.
+ *
+ * @example
+ * template: html`<button @click="buy()">Price: \${{ price }}</button>`
+ */
+export function html(strings: TemplateStringsArray, ...values: any[]): string {
+    let result = '';
+    strings.raw.forEach((raw, i) => {
+        result += raw.replace(/\\\$/g, '$');
+        if (i < values.length) result += String(values[i] ?? '');
+    });
+    return result;
+}
+
+export interface AutoInitOptions {
+    components?: Record<string, ComponentConfig>;
+    directives?: Record<string, DirectiveDef | DirectiveShorthand>;
+    globalProperties?: Record<string, any>;
+}
+
+export function autoInit(options: AutoInitOptions = {}): void {
+    const parseInline = (expr: string): { data: Record<string, any>; methods: Record<string, Function> } => {
+        if (!expr.trim() || !expr.trim().startsWith('{')) return { data: {}, methods: {} };
+        try {
+            const obj = new Function(`return (${expr})`)() ?? {};
+            const data: Record<string, any> = {};
+            const methods: Record<string, Function> = {};
+            Object.entries(obj).forEach(([k, v]) => {
+                if (typeof v === 'function') methods[k] = v as Function;
+                else data[k] = v;
+            });
+            return { data, methods };
+        } catch { return { data: {}, methods: {} }; }
+    };
+
+    const run = () => {
+        document.querySelectorAll<HTMLElement>('[cv-data]').forEach(el => {
+            // Skip elements nested inside another [cv-data] — outer will handle them
+            if (el.parentElement?.closest('[cv-data]')) return;
+
+            const dataExpr = (el.getAttribute('cv-data') ?? '').trim();
+            el.removeAttribute('cv-data');
+
+            let cfg: ComponentConfig;
+
+            // Named component: cv-data="my-counter"
+            const namedComp = dataExpr && !dataExpr.startsWith('{')
+                ? options.components?.[dataExpr]
+                : null;
+
+            if (namedComp) {
+                cfg = {
+                    ...namedComp,
+                    components: { ...(namedComp.components ?? {}), ...(options.components ?? {}) },
+                };
+            } else {
+                const { data, methods } = parseInline(dataExpr);
+                cfg = { data, methods };
+            }
+
+            createApp({
+                ...cfg,
+                components: { ...(cfg.components ?? {}), ...(options.components ?? {}) },
+                directives: options.directives,
+                globalProperties: options.globalProperties,
+            }).mountEl(el);
+        });
+    };
+
+    if (typeof document === 'undefined') return;
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run, { once: true });
+    } else {
+        Promise.resolve().then(run);
+    }
 }

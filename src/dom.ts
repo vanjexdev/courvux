@@ -1,5 +1,6 @@
 import { ComponentConfig, Router, DirectiveDef, DirectiveBinding, DirectiveShorthand } from './types.js';
 import { subscribeToStore } from './store.js';
+import { createReactivityScope } from './reactivity.js';
 
 export interface WalkContext {
     subscribe: (key: string, cb: Function) => () => void;
@@ -15,6 +16,11 @@ export interface WalkContext {
     provided?: Record<string, any>;
     directives?: Record<string, DirectiveDef | DirectiveShorthand>;
     registerCleanup?: (cleanup: () => void) => void;
+    createChildScope?: (data: Record<string, any>, methods: Record<string, Function>) => {
+        state: any;
+        subscribe: (key: string, cb: Function) => () => void;
+        cleanup: () => void;
+    };
 }
 
 export const resolve = (expr: string, state: any): any =>
@@ -24,6 +30,9 @@ const evalSupported = (() => {
     try { new Function('return 1')(); return true; }
     catch { console.warn('[courvux] CSP blocks eval. Expressions limited to property access and literals.'); return false; }
 })();
+
+const evalCache = new Map<string, Function>();
+const handlerCache = new Map<string, Function>();
 
 const safeEval = (expr: string, state: any): any => {
     const t = expr.trim();
@@ -40,7 +49,11 @@ const safeEval = (expr: string, state: any): any => {
 export const evaluate = (expr: string, state: any): any => {
     if (!evalSupported) return safeEval(expr, state);
     try {
-        const fn = new Function('$data', `with($data) { return (${expr}) }`);
+        let fn = evalCache.get(expr);
+        if (!fn) {
+            fn = new Function('$data', `with($data) { return (${expr}) }`);
+            evalCache.set(expr, fn);
+        }
         return fn(state);
     } catch {
         return resolve(expr, state);
@@ -110,6 +123,11 @@ const applyStyle = (el: HTMLElement, val: any, staticStyle: string) => {
 const executeHandler = (expr: string, state: any, event: Event): void => {
     if (!evalSupported) return;
     try {
+        let fn = handlerCache.get(expr);
+        if (!fn) {
+            fn = new Function('__p__', `with(__p__){${expr}}`);
+            handlerCache.set(expr, fn);
+        }
         const proxy = new Proxy({} as any, {
             has: () => true,
             get: (_t, k: string) => {
@@ -119,8 +137,6 @@ const executeHandler = (expr: string, state: any, event: Event): void => {
             },
             set: (_t, k: string, v: any) => { state[k] = v; return true; }
         });
-        // new Function is non-strict → 'with' works
-        const fn = new Function('__p__', `with(__p__){${expr}}`);
         fn(proxy);
     } catch (e) {
         console.warn(`[courvux] handler error "${expr}":`, e);
@@ -167,6 +183,32 @@ function injectCvTransitionStyles() {
     document.head.appendChild(s);
 }
 
+let cloakStyleInjected = false;
+export function injectCloakStyle() {
+    if (cloakStyleInjected || typeof document === 'undefined') return;
+    cloakStyleInjected = true;
+    const s = document.createElement('style');
+    s.id = 'cv-cloak-style';
+    s.textContent = '[cv-cloak]{display:none!important}';
+    document.head.appendChild(s);
+}
+
+function sanitizeHtml(html: string): string {
+    if (typeof window !== 'undefined' && 'Sanitizer' in window) {
+        const tmp = document.createElement('div');
+        (tmp as any).setHTML(html, { sanitizer: new (window as any).Sanitizer() });
+        return tmp.innerHTML;
+    }
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script,iframe,object,embed,form,meta,link,style').forEach(e => e.remove());
+    doc.querySelectorAll('*').forEach(e => {
+        Array.from(e.attributes).forEach(a => {
+            if (a.name.startsWith('on') || a.value.trim().toLowerCase().startsWith('javascript:')) e.removeAttribute(a.name);
+        });
+    });
+    return doc.body.innerHTML;
+}
+
 export async function walk(el: Node, state: any, context: WalkContext) {
     const nodes = Array.from(el.childNodes);
     let i = 0;
@@ -203,6 +245,13 @@ export async function walk(el: Node, state: any, context: WalkContext) {
         const element = node as HTMLElement;
         const tagName = element.tagName.toLowerCase();
 
+        // cv-pre — skip any processing; raw content preserved as-is (useful for code samples)
+        if (element.hasAttribute('cv-pre')) {
+            element.removeAttribute('cv-pre');
+            i++;
+            continue;
+        }
+
         // cv-once — render sin reactividad
         if (element.hasAttribute('cv-once')) {
             element.removeAttribute('cv-once');
@@ -215,6 +264,9 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             i++;
             continue;
         }
+
+        // cv-cloak — CSS hides element until framework processes it; removed here during walk
+        if (element.hasAttribute('cv-cloak')) element.removeAttribute('cv-cloak');
 
         // cv-teleport — renderiza el elemento en otro nodo del DOM
         if (element.hasAttribute('cv-teleport')) {
@@ -229,6 +281,71 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             continue;
         }
 
+        // cv-memo — congela el subtree; solo actualiza cuando cambien las deps explícitas
+        if (element.hasAttribute('cv-memo')) {
+            const depsExpr = element.getAttribute('cv-memo')!;
+            element.removeAttribute('cv-memo');
+            const getDeps = () => depsExpr.split(',').map(e => evaluate(e.trim(), state));
+            let prevDeps = getDeps();
+            // Collect all DOM callbacks without wiring real subscriptions
+            const memoCallbacks: Array<() => void> = [];
+            const makeMemoUnsub = (cb: Function) => {
+                memoCallbacks.push(cb as () => void);
+                return () => { const idx = memoCallbacks.indexOf(cb as () => void); if (idx > -1) memoCallbacks.splice(idx, 1); };
+            };
+            await walk(element, state, {
+                ...context,
+                subscribe: (_key, cb) => makeMemoUnsub(cb),
+                storeSubscribeOverride: (_store, _key, cb) => makeMemoUnsub(cb),
+            });
+            const unsub = subscribeDeps(depsExpr, context, () => {
+                const newDeps = getDeps();
+                if (newDeps.some((v, i) => v !== prevDeps[i])) {
+                    prevDeps = newDeps;
+                    [...memoCallbacks].forEach(cb => cb());
+                }
+            });
+            context.registerCleanup?.(() => unsub());
+            i++;
+            continue;
+        }
+
+        // cv-data — inline reactive scope; data+methods merged on top of parent state
+        if (element.hasAttribute('cv-data')) {
+            const dataExpr = element.getAttribute('cv-data')!.trim();
+            element.removeAttribute('cv-data');
+
+            let childData: Record<string, any> = {};
+            let childMethods: Record<string, Function> = {};
+
+            if (dataExpr.startsWith('{')) {
+                const obj = evaluate(dataExpr, state) ?? {};
+                Object.entries(obj).forEach(([k, v]) => {
+                    if (typeof v === 'function') childMethods[k] = v as Function;
+                    else childData[k] = v;
+                });
+            } else if (dataExpr) {
+                const comp = context.components?.[dataExpr];
+                if (comp) {
+                    const raw = typeof comp.data === 'function'
+                        ? (comp.data as () => Record<string, any>)()
+                        : (comp.data ?? {});
+                    if (!(raw instanceof Promise)) Object.assign(childData, raw);
+                    Object.assign(childMethods, comp.methods ?? {});
+                }
+            }
+
+            if (context.createChildScope) {
+                const child = context.createChildScope(childData, childMethods);
+                context.registerCleanup?.(child.cleanup);
+                await walk(element, child.state, { ...context, subscribe: child.subscribe });
+            } else {
+                await walk(element, { ...state, ...childData, ...childMethods }, context);
+            }
+            i++;
+            continue;
+        }
+
         // cv-for
         if (element.hasAttribute('cv-for')) {
             const expr = element.getAttribute('cv-for')!;
@@ -239,19 +356,24 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 const [, itemVar, indexVar, collectionExpr] = match;
                 const keyExpr = element.getAttribute(':key') ?? null;
                 if (keyExpr) element.removeAttribute(':key');
+                const forTransition = element.getAttribute('cv-transition') ?? null;
+                if (forTransition) element.removeAttribute('cv-transition');
                 const anchor = document.createComment(`cv-for: ${collectionExpr}`);
                 element.replaceWith(anchor);
                 let rendered: Node[] = [];
                 let itemUnsubs: Array<() => void> = [];
-                // keyed diffing: key → { el, cleanup }
-                const keyNodeMap = new Map<any, { el: HTMLElement; destroy: () => void }>();
+                // keyed diffing: key → { el, reactive, destroy }
+                // reactive holds per-item reactive state so targeted updates are possible
+                const keyNodeMap = new Map<any, { el: HTMLElement; reactive: any; itemRef: any; destroy: () => void }>();
 
                 const render = async () => {
                     const collection = evaluate(collectionExpr, state);
                     const entries: [any, any][] = !collection ? [] :
-                        Array.isArray(collection)
-                            ? collection.map((v: any, idx: number) => [v, idx])
-                            : Object.entries(collection).map(([k, v]) => [v, k]);
+                        typeof collection === 'number'
+                            ? Array.from({ length: collection }, (_, i) => [i + 1, i])
+                            : Array.isArray(collection)
+                                ? collection.map((v: any, idx: number) => [v, idx])
+                                : Object.entries(collection).map(([k, v]) => [v, k]);
 
                     if (keyExpr) {
                         // --- keyed diffing ---
@@ -266,26 +388,81 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                             newEntries.set(k, [item, index]);
                         }
 
-                        // remove stale nodes
+                        // remove stale nodes (with optional leave animation)
+                        const leavePromises: Promise<void>[] = [];
                         for (const [k, { el, destroy }] of keyNodeMap) {
                             if (!newEntries.has(k)) {
-                                destroy();
-                                el.parentNode?.removeChild(el);
-                                keyNodeMap.delete(k);
+                                if (forTransition) {
+                                    el.classList.add(`${forTransition}-leave`);
+                                    leavePromises.push(
+                                        waitForTransition(el).then(() => {
+                                            el.classList.remove(`${forTransition}-leave`);
+                                            destroy();
+                                            el.parentNode?.removeChild(el);
+                                            keyNodeMap.delete(k);
+                                        })
+                                    );
+                                } else {
+                                    destroy();
+                                    el.parentNode?.removeChild(el);
+                                    keyNodeMap.delete(k);
+                                }
                             }
                         }
+                        if (leavePromises.length) await Promise.all(leavePromises);
 
-                        // create nodes for new keys
+                        // update existing nodes or create new ones
                         const parent = anchor.parentNode!;
+                        const enterEls: HTMLElement[] = [];
                         for (const k of newKeys) {
-                            if (!keyNodeMap.has(k)) {
-                                const [item, index] = newEntries.get(k)!;
+                            const [item, index] = newEntries.get(k)!;
+                            if (keyNodeMap.has(k)) {
+                                // Existing key: only update reactive if item reference or index changed,
+                                // skipping unnecessary reactive notifications for unchanged data.
+                                const entry = keyNodeMap.get(k)!;
+                                if (entry.itemRef !== item) {
+                                    entry.reactive[itemVar] = item;
+                                    entry.itemRef = item;
+                                }
+                                if (indexVar) entry.reactive[indexVar] = index;
+                            } else {
+                                // New key: create fresh node with isolated reactive scope for
+                                // item/index vars so updates are targeted, not full re-renders.
                                 const clone = element.cloneNode(true) as HTMLElement;
                                 const perItemUnsubs: Array<() => void> = [];
+
+                                const { subscribe: itemSub, createReactiveState: itemCreate } = createReactivityScope();
+                                const itemReactive = itemCreate({
+                                    [itemVar]: item,
+                                    ...(indexVar ? { [indexVar]: index } : {})
+                                }) as any;
+
+                                // Proxy: itemVar/indexVar → per-item reactive scope; rest → parent state
+                                const mergedItemState = new Proxy({} as any, {
+                                    get(_, key: string) {
+                                        if (typeof key !== 'string') return (state as any)[key];
+                                        if (key === itemVar || (indexVar && key === indexVar)) return itemReactive[key];
+                                        return (state as any)[key];
+                                    },
+                                    set(_, key: string, val: any) {
+                                        if (key === itemVar || (indexVar && key === indexVar)) {
+                                            itemReactive[key] = val; return true;
+                                        }
+                                        (state as any)[key] = val; return true;
+                                    }
+                                });
+
+                                // Subscribe: route itemVar/indexVar to item scope, rest to parent
                                 const childCtx: WalkContext = {
                                     ...context,
-                                    subscribe: (key, cb) => {
-                                        const unsub = context.subscribe(key, cb);
+                                    subscribe: (key: string, cb: Function) => {
+                                        const baseKey = key.split('.')[0];
+                                        let unsub: () => void;
+                                        if (baseKey === itemVar || (indexVar && baseKey === indexVar)) {
+                                            unsub = itemSub(baseKey, cb);
+                                        } else {
+                                            unsub = context.subscribe(key, cb);
+                                        }
                                         perItemUnsubs.push(unsub);
                                         return unsub;
                                     },
@@ -295,22 +472,51 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                                         return unsub;
                                     }
                                 };
-                                await walk(clone, makeItemState(state, item, itemVar, index, indexVar), childCtx);
-                                keyNodeMap.set(k, { el: clone, destroy: () => perItemUnsubs.forEach(u => u()) });
+
+                                await walk(clone, mergedItemState, childCtx);
+                                if (forTransition) clone.classList.add(`${forTransition}-enter`);
+                                keyNodeMap.set(k, {
+                                    el: clone,
+                                    reactive: itemReactive,
+                                    itemRef: item,
+                                    destroy: () => perItemUnsubs.forEach(u => u())
+                                });
+                                if (forTransition) enterEls.push(clone);
                             }
                         }
 
-                        // reorder: walk from anchor, place each key node in order
+                        // reorder: count mismatches first; few → targeted moves, many → single fragment
                         let cursor: ChildNode | null = anchor.nextSibling;
+                        let mismatches = 0;
                         for (const k of newKeys) {
                             const { el } = keyNodeMap.get(k)!;
-                            if (el !== cursor) {
-                                parent.insertBefore(el, cursor);
+                            if (el !== cursor) mismatches++;
+                            else cursor = el.nextSibling;
+                        }
+                        if (mismatches > 0) {
+                            if (mismatches > (newKeys.length >> 1)) {
+                                // majority displaced → batch all into one fragment insert
+                                const frag = document.createDocumentFragment();
+                                for (const k of newKeys) frag.appendChild(keyNodeMap.get(k)!.el);
+                                parent.insertBefore(frag, anchor.nextSibling);
                             } else {
-                                cursor = el.nextSibling;
+                                // few displacements → targeted insertBefore per out-of-place node
+                                cursor = anchor.nextSibling;
+                                for (const k of newKeys) {
+                                    const { el } = keyNodeMap.get(k)!;
+                                    if (el !== cursor) parent.insertBefore(el, cursor);
+                                    else cursor = el.nextSibling;
+                                }
                             }
                         }
                         rendered = newKeys.map(k => keyNodeMap.get(k)!.el);
+
+                        // trigger enter animations after elements are in DOM
+                        if (enterEls.length) {
+                            Promise.all(enterEls.map(el =>
+                                waitForTransition(el).then(() => el.classList.remove(`${forTransition!}-enter`))
+                            ));
+                        }
 
                     } else {
                         // --- no key: destroy and recreate all ---
@@ -430,24 +636,242 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             continue;
         }
 
-        // cv-show
+        // cv-show — supports optional transition via cv-show-transition, :transition, or cv-transition[:[enter|leave]*]
         if (element.hasAttribute('cv-show')) {
             const expr = element.getAttribute('cv-show')!;
             element.removeAttribute('cv-show');
-            const update = () => { element.style.display = evaluate(expr, state) ? '' : 'none'; };
-            subscribeDeps(expr, context, update);
-            update();
+
+            // Alpine-style cv-transition attribute detection
+            const cvtAttrs = Array.from(element.attributes).filter(a =>
+                a.name === 'cv-transition' || a.name.startsWith('cv-transition:') || a.name.startsWith('cv-transition.')
+            );
+            const hasAlpineTransition = cvtAttrs.length > 0;
+
+            if (hasAlpineTransition) {
+                // Collect class strings from cv-transition:enter / :enter-start / :enter-end / :leave / :leave-start / :leave-end
+                const getClasses = (name: string) => (element.getAttribute(name) ?? '').split(' ').filter(Boolean);
+                const enterCls = getClasses('cv-transition:enter');
+                const enterStartCls = getClasses('cv-transition:enter-start');
+                const enterEndCls = getClasses('cv-transition:enter-end');
+                const leaveCls = getClasses('cv-transition:leave');
+                const leaveStartCls = getClasses('cv-transition:leave-start');
+                const leaveEndCls = getClasses('cv-transition:leave-end');
+
+                // Bare cv-transition modifiers: .opacity .scale .scale.80 .duration.300
+                const bareVal = element.getAttribute('cv-transition') ?? '';
+                const bareMods = new Set(bareVal.split('.').slice(1));
+                const durationMod = [...bareMods].find(m => /^\d+$/.test(m));
+                const duration = durationMod ? parseInt(durationMod) : 200;
+                const hasCustomClasses = enterCls.length || enterStartCls.length || leaveCls.length || leaveStartCls.length;
+
+                // Built-in when no custom classes: inject transition style inline
+                if (!hasCustomClasses) {
+                    const scaleMod = [...bareMods].find(m => m === 'scale' || /^scale$/.test(m));
+                    const scaleVal = (() => {
+                        const sv = [...bareMods].find(m => /^\d+$/.test(m) && m !== durationMod);
+                        return sv ? parseInt(sv) / 100 : 0.9;
+                    })();
+                    const parts: string[] = [];
+                    if (!bareMods.has('scale') || bareMods.has('opacity')) parts.push(`opacity ${duration}ms ease`);
+                    if (scaleMod) parts.push(`transform ${duration}ms ease`);
+                    if (!parts.length) parts.push(`opacity ${duration}ms ease`);
+                    element.style.transition = (element.style.transition ? element.style.transition + ', ' : '') + parts.join(', ');
+                    cvtAttrs.forEach(a => element.removeAttribute(a.name));
+
+                    let visible = !!evaluate(expr, state);
+                    const twoRafs = () => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+                    const applyBuiltin = async (show: boolean) => {
+                        if (show) {
+                            element.style.display = '';
+                            element.style.opacity = '0';
+                            if (scaleMod) element.style.transform = `scale(${scaleVal})`;
+                            await twoRafs();
+                            element.style.opacity = '';
+                            if (scaleMod) element.style.transform = '';
+                            await waitForTransition(element);
+                        } else {
+                            element.style.opacity = '0';
+                            if (scaleMod) element.style.transform = `scale(${scaleVal})`;
+                            await waitForTransition(element);
+                            element.style.display = 'none';
+                            element.style.opacity = '';
+                            if (scaleMod) element.style.transform = '';
+                        }
+                        visible = show;
+                    };
+
+                    if (!visible) element.style.display = 'none';
+                    subscribeDeps(expr, context, () => { const v = !!evaluate(expr, state); if (v !== visible) applyBuiltin(v); });
+                } else {
+                    // Class-based Alpine-compatible transition
+                    cvtAttrs.forEach(a => element.removeAttribute(a.name));
+                    const twoRafs = () => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+                    let visible = !!evaluate(expr, state);
+                    let transitioning = false;
+                    let pending: boolean | null = null;
+
+                    const applyClasses = async (show: boolean) => {
+                        if (transitioning) { pending = show; return; }
+                        transitioning = true;
+                        try {
+                            if (show) {
+                                element.style.display = '';
+                                element.classList.add(...enterCls, ...enterStartCls);
+                                await twoRafs();
+                                element.classList.remove(...enterStartCls);
+                                element.classList.add(...enterEndCls);
+                                await waitForTransition(element);
+                                element.classList.remove(...enterCls, ...enterEndCls);
+                            } else {
+                                element.classList.add(...leaveCls, ...leaveStartCls);
+                                await twoRafs();
+                                element.classList.remove(...leaveStartCls);
+                                element.classList.add(...leaveEndCls);
+                                await waitForTransition(element);
+                                element.classList.remove(...leaveCls, ...leaveEndCls);
+                                element.style.display = 'none';
+                            }
+                            visible = show;
+                        } finally {
+                            transitioning = false;
+                            if (pending !== null && pending !== visible) {
+                                const next = pending; pending = null; applyClasses(next);
+                            } else pending = null;
+                        }
+                    };
+
+                    if (!visible) element.style.display = 'none';
+                    subscribeDeps(expr, context, () => { const v = !!evaluate(expr, state); if (v !== visible) applyClasses(v); });
+                }
+            } else {
+                // Legacy name-based transition: cv-show-transition="name" or :transition="expr"
+                const staticTrans = element.getAttribute('cv-show-transition');
+                const dynamicTrans = element.getAttribute(':transition');
+                if (staticTrans) element.removeAttribute('cv-show-transition');
+                if (dynamicTrans) element.removeAttribute(':transition');
+                const transitionName = staticTrans ?? (dynamicTrans ? String(evaluate(dynamicTrans, state)) : null);
+
+                if (transitionName) {
+                    injectCvTransitionStyles();
+                    let visible = !!evaluate(expr, state);
+                    if (!visible) element.style.display = 'none';
+                    let transitioning = false;
+                    let pending: boolean | null = null;
+                    const animate = async (show: boolean) => {
+                        if (transitioning) { pending = show; return; }
+                        transitioning = true;
+                        try {
+                            if (show) {
+                                element.style.display = '';
+                                element.classList.add(`${transitionName}-enter`);
+                                await waitForTransition(element);
+                                element.classList.remove(`${transitionName}-enter`);
+                            } else {
+                                element.classList.add(`${transitionName}-leave`);
+                                await waitForTransition(element);
+                                element.classList.remove(`${transitionName}-leave`);
+                                element.style.display = 'none';
+                            }
+                            visible = show;
+                        } finally {
+                            transitioning = false;
+                            if (pending !== null && pending !== visible) {
+                                const next = pending; pending = null; animate(next);
+                            } else pending = null;
+                        }
+                    };
+                    subscribeDeps(expr, context, () => { const v = !!evaluate(expr, state); if (v !== visible) animate(v); });
+                } else {
+                    const update = () => { element.style.display = evaluate(expr, state) ? '' : 'none'; };
+                    subscribeDeps(expr, context, update);
+                    update();
+                }
+            }
         }
 
-        // cv-html
-        if (element.hasAttribute('cv-html')) {
-            const expr = element.getAttribute('cv-html')!;
-            element.removeAttribute('cv-html');
-            const update = () => { element.innerHTML = String(evaluate(expr, state) ?? ''); };
-            subscribeDeps(expr, context, update);
-            update();
-            i++;
-            continue;
+        // cv-focus — auto-focus element on mount or when condition becomes truthy
+        if (element.hasAttribute('cv-focus')) {
+            const expr = element.getAttribute('cv-focus') ?? '';
+            element.removeAttribute('cv-focus');
+            if (!expr) {
+                Promise.resolve().then(() => (element as HTMLElement).focus());
+            } else {
+                const doFocus = () => { if (evaluate(expr, state)) Promise.resolve().then(() => (element as HTMLElement).focus()); };
+                subscribeDeps(expr, context, doFocus);
+                doFocus();
+            }
+        }
+
+        // cv-intersect — IntersectionObserver directive
+        // cv-intersect="expr"          → fires expr when element enters viewport
+        // cv-intersect:enter="expr"    → fires on enter
+        // cv-intersect:leave="expr"    → fires on leave
+        // modifiers: .once  .half (0.5)  .full (1.0)  .threshold-75  .margin-200
+        {
+            const interAttrs = Array.from(element.attributes).filter(a =>
+                a.name === 'cv-intersect' || a.name.startsWith('cv-intersect:') || a.name.startsWith('cv-intersect.')
+            );
+            if (interAttrs.length && typeof IntersectionObserver !== 'undefined') {
+                const enterAttr = interAttrs.find(a => a.name === 'cv-intersect' || a.name === 'cv-intersect:enter' || a.name.startsWith('cv-intersect.'));
+                const leaveAttr = interAttrs.find(a => a.name === 'cv-intersect:leave');
+                const enterExpr = enterAttr?.value ?? '';
+                const leaveExpr = leaveAttr?.value ?? '';
+
+                // Parse modifiers from entering attribute name
+                const modParts = (enterAttr?.name ?? 'cv-intersect').split('.');
+                const mods = new Set(modParts.slice(1));
+                const once = mods.has('once');
+                let threshold = 0;
+                if (mods.has('half')) threshold = 0.5;
+                else if (mods.has('full')) threshold = 1.0;
+                else {
+                    const tMod = [...mods].find(m => m.startsWith('threshold-'));
+                    if (tMod) threshold = parseInt(tMod.replace('threshold-', '')) / 100;
+                }
+                const marginMod = [...mods].find(m => m.startsWith('margin-'));
+                const rootMargin = marginMod ? `${marginMod.replace('margin-', '')}px` : undefined;
+
+                interAttrs.forEach(a => element.removeAttribute(a.name));
+
+                const runExpr = (expr: string) => {
+                    if (!expr) return;
+                    try { new Function('$data', `with($data){${expr}}`)(state); }
+                    catch (e) { console.warn(`[courvux] cv-intersect error "${expr}":`, e); }
+                };
+
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            runExpr(enterExpr);
+                            if (once) observer.disconnect();
+                        } else {
+                            runExpr(leaveExpr);
+                        }
+                    });
+                }, { threshold, ...(rootMargin ? { rootMargin } : {}) });
+
+                observer.observe(element);
+                context.registerCleanup?.(() => observer.disconnect());
+            }
+        }
+
+        // cv-html [.sanitize] — set innerHTML; add .sanitize modifier to strip XSS vectors
+        {
+            const htmlAttr = Array.from(element.attributes).find(a => a.name === 'cv-html' || a.name.startsWith('cv-html.'));
+            if (htmlAttr) {
+                const expr = htmlAttr.value;
+                element.removeAttribute(htmlAttr.name);
+                const doSanitize = htmlAttr.name.split('.').slice(1).includes('sanitize');
+                const update = () => {
+                    const raw = String(evaluate(expr, state) ?? '');
+                    element.innerHTML = doSanitize ? sanitizeHtml(raw) : raw;
+                };
+                subscribeDeps(expr, context, update);
+                update();
+                i++;
+                continue;
+            }
         }
 
         // cv-ref — native: set element; custom component: leave attr for createMountElement
@@ -589,6 +1013,12 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 const fragment = document.createDocumentFragment();
                 nodes.forEach(n => fragment.appendChild(n));
                 element.replaceWith(fragment);
+            } else {
+                // Fallback content — walk slot children in current component scope
+                const frag = document.createDocumentFragment();
+                while (element.firstChild) frag.appendChild(element.firstChild);
+                await walk(frag, state, context);
+                element.replaceWith(frag);
             }
             i++;
             continue;
@@ -715,6 +1145,146 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             await context.mountElement(element, tagName, state, context);
             i++;
             continue;
+        }
+
+        // cv-intersect — IntersectionObserver; fires handler when element enters/exits viewport
+        // Usage: cv-intersect="handler" | cv-intersect="{ handler, threshold: 0.5, margin: '100px', once: true }"
+        // Modifier: cv-intersect.once fires only on first intersection
+        {
+            const intersectAttr = Array.from(element.attributes).find(
+                a => a.name === 'cv-intersect' || a.name.startsWith('cv-intersect.')
+            );
+            if (intersectAttr && typeof IntersectionObserver !== 'undefined') {
+                const mods = new Set(intersectAttr.name.split('.').slice(1));
+                element.removeAttribute(intersectAttr.name);
+                const val = evaluate(intersectAttr.value, state);
+                let handlerFn: ((entry: IntersectionObserverEntry) => void) | undefined;
+                let threshold = 0;
+                let rootMargin = '0px';
+                let once = mods.has('once');
+                if (typeof val === 'function') {
+                    handlerFn = (entry) => (val as Function).call(state, entry);
+                } else if (val && typeof val === 'object') {
+                    if (typeof val.handler === 'function') handlerFn = (entry) => val.handler.call(state, entry);
+                    if (val.threshold !== undefined) threshold = val.threshold;
+                    if (val.margin) rootMargin = val.margin;
+                    if (val.once) once = true;
+                }
+                if (handlerFn) {
+                    const observer = new IntersectionObserver((entries) => {
+                        const entry = entries[0];
+                        handlerFn!(entry);
+                        if (once && entry.isIntersecting) observer.disconnect();
+                    }, { threshold, rootMargin });
+                    observer.observe(element);
+                    context.registerCleanup?.(() => observer.disconnect());
+                }
+            }
+        }
+
+        // cv-resize — ResizeObserver; fires when element dimensions change
+        // Usage: cv-resize="handler" | cv-resize="{ handler, box: 'border-box' }"
+        if (element.hasAttribute('cv-resize')) {
+            const expr = element.getAttribute('cv-resize')!;
+            element.removeAttribute('cv-resize');
+            if (typeof ResizeObserver !== 'undefined') {
+                const val = evaluate(expr, state);
+                let handlerFn: ((entry: ResizeObserverEntry) => void) | undefined;
+                let box: ResizeObserverBoxOptions = 'content-box';
+                if (typeof val === 'function') {
+                    handlerFn = (entry) => (val as Function).call(state, entry);
+                } else if (val && typeof val === 'object') {
+                    if (typeof val.handler === 'function') handlerFn = (entry) => val.handler.call(state, entry);
+                    if (val.box) box = val.box;
+                }
+                if (handlerFn) {
+                    const observer = new ResizeObserver(entries => { if (entries[0]) handlerFn!(entries[0]); });
+                    observer.observe(element, { box });
+                    context.registerCleanup?.(() => observer.disconnect());
+                }
+            }
+        }
+
+        // cv-scroll — scroll event with position info and optional throttle
+        // Usage: cv-scroll="handler" | cv-scroll="{ handler, throttle: 100 }"
+        if (element.hasAttribute('cv-scroll')) {
+            const expr = element.getAttribute('cv-scroll')!;
+            element.removeAttribute('cv-scroll');
+            const val = evaluate(expr, state);
+            let handlerFn: ((info: { scrollTop: number; scrollLeft: number; scrollHeight: number; scrollWidth: number; clientHeight: number; clientWidth: number }) => void) | undefined;
+            let throttleMs = 0;
+            if (typeof val === 'function') {
+                handlerFn = (info) => (val as Function).call(state, info);
+            } else if (val && typeof val === 'object') {
+                if (typeof val.handler === 'function') handlerFn = (info) => val.handler.call(state, info);
+                if (val.throttle) throttleMs = val.throttle;
+            }
+            if (handlerFn) {
+                let lastTime = 0;
+                const onScroll = () => {
+                    const now = Date.now();
+                    if (throttleMs > 0 && now - lastTime < throttleMs) return;
+                    lastTime = now;
+                    handlerFn!({
+                        scrollTop: element.scrollTop, scrollLeft: element.scrollLeft,
+                        scrollHeight: element.scrollHeight, scrollWidth: element.scrollWidth,
+                        clientHeight: element.clientHeight, clientWidth: element.clientWidth,
+                    });
+                };
+                element.addEventListener('scroll', onScroll, { passive: true });
+                context.registerCleanup?.(() => element.removeEventListener('scroll', onScroll));
+            }
+        }
+
+        // cv-clickoutside — fires handler when user clicks outside this element
+        if (element.hasAttribute('cv-clickoutside')) {
+            const expr = element.getAttribute('cv-clickoutside')!;
+            element.removeAttribute('cv-clickoutside');
+            const handler = (e: MouseEvent) => {
+                if (!element.contains(e.target as Node)) {
+                    if (typeof state[expr] === 'function') {
+                        (state[expr] as Function).call(state, e);
+                    } else {
+                        executeHandler(expr, state, e);
+                    }
+                }
+            };
+            document.addEventListener('click', handler, true);
+            context.registerCleanup?.(() => document.removeEventListener('click', handler, true));
+        }
+
+        // cv-bind — bind multiple attributes from an object expression
+        if (element.hasAttribute('cv-bind')) {
+            const bindExpr = element.getAttribute('cv-bind')!;
+            element.removeAttribute('cv-bind');
+            const staticClass = element.getAttribute('class') ?? '';
+            const staticStyle = element.getAttribute('style') ?? '';
+            let prevKeys: string[] = [];
+            const applyBind = () => {
+                const obj: Record<string, any> = evaluate(bindExpr, state) ?? {};
+                const newKeys = Object.keys(obj);
+                for (const k of prevKeys) {
+                    if (!(k in obj)) {
+                        if (k === 'class') element.className = staticClass;
+                        else if (k === 'style') element.style.cssText = staticStyle;
+                        else element.removeAttribute(k);
+                    }
+                }
+                for (const [k, val] of Object.entries(obj)) {
+                    if (k === 'class') {
+                        element.className = [staticClass, resolveClass(val)].filter(Boolean).join(' ');
+                    } else if (k === 'style') {
+                        applyStyle(element, val, staticStyle);
+                    } else if (val === null || val === undefined || val === false) {
+                        element.removeAttribute(k);
+                    } else {
+                        element.setAttribute(k, val === true ? '' : String(val));
+                    }
+                }
+                prevKeys = newKeys;
+            };
+            subscribeDeps(bindExpr, context, applyBind);
+            applyBind();
         }
 
         // Atributos: @eventos y :bindings

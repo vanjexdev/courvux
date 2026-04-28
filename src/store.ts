@@ -1,17 +1,20 @@
+import { isRaw } from './reactivity.js';
+
 const storeSubscribers = new WeakMap<object, (key: string, cb: Function) => () => void>();
 
 export interface StoreConfig<T extends object> {
     state: T;
     actions?: Record<string, (...args: any[]) => void>;
     modules?: Record<string, StoreConfig<any>>;
+    onChange?: (key: string, value: any) => void;
 }
 
 function makeDeepNotifyProxy(val: any, notify: () => void): any {
-    if (val === null || typeof val !== 'object') return val;
+    if (val === null || typeof val !== 'object' || isRaw(val)) return val;
     return new Proxy(val, {
         get(t, k: string) {
             const v = t[k];
-            if (v !== null && typeof v === 'object') return makeDeepNotifyProxy(v, notify);
+            if (v !== null && typeof v === 'object' && !isRaw(v)) return makeDeepNotifyProxy(v, notify);
             return v;
         },
         set(t, k: string, v) { t[k] = v; notify(); return true; }
@@ -56,7 +59,7 @@ export function createStore<T extends object>(config: StoreConfig<T>): T & Recor
             }
             const val = target[key];
             // Wrap plain nested objects so deep mutations (e.g. store.a.b.c = x) notify top-level key
-            if (val !== null && typeof val === 'object' && !storeSubscribers.has(val)) {
+            if (val !== null && typeof val === 'object' && !storeSubscribers.has(val) && !isRaw(val)) {
                 return makeDeepNotifyProxy(val, () => notifyKey(key));
             }
             return val;
@@ -65,6 +68,7 @@ export function createStore<T extends object>(config: StoreConfig<T>): T & Recor
             if (key in modules) return true;
             target[key] = value;
             notifyKey(key);
+            config.onChange?.(key, value);
             return true;
         }
     });

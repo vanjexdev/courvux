@@ -4,6 +4,8 @@ export type RouteActivation = {
     destroy: () => void;
     activate?: () => void;
     deactivate?: () => void;
+    beforeLeave?: (to: RouteMatch, next: (redirect?: string) => void) => void;
+    enter?: (from: RouteMatch | null) => void;
 };
 
 type MountFn = (el: HTMLElement, config: ComponentConfig, route: RouteMatch, layout?: string, childRouter?: Router) => Promise<RouteActivation>;
@@ -94,6 +96,11 @@ function normalizeRoutes(routes: RouteConfig[], prefix = ''): RouteConfig[] {
 const runGuard = (guard: NavigationGuard, routeMatch: RouteMatch): Promise<string | undefined> =>
     new Promise<string | undefined>(resolve => guard(routeMatch, resolve));
 
+const runComponentLeaveGuard = (activation: RouteActivation | null, to: RouteMatch): Promise<string | undefined> => {
+    if (!activation?.beforeLeave) return Promise.resolve(undefined);
+    return new Promise<string | undefined>(resolve => activation.beforeLeave!(to, resolve));
+};
+
 export function createRouter(routes: RouteConfig[], options: {
     mode?: 'hash' | 'history';
     transition?: string;
@@ -110,21 +117,23 @@ export function createRouter(routes: RouteConfig[], options: {
         beforeEach: options.beforeEach,
         afterEach: options.afterEach,
         scrollBehavior: options.scrollBehavior,
-        navigate(path: string) {
+        navigate(path: string, options?: { query?: Record<string, string> }) {
+            const full = buildUrl(path, options?.query);
             if (mode === 'history') {
-                history.pushState({}, '', path);
+                history.pushState({}, '', full);
                 window.dispatchEvent(new PopStateEvent('popstate'));
             } else {
-                window.location.hash = path;
+                window.location.hash = full;
             }
         },
-        replace(path: string) {
+        replace(path: string, options?: { query?: Record<string, string> }) {
+            const full = buildUrl(path, options?.query);
             if (mode === 'history') {
-                history.replaceState({}, '', path);
+                history.replaceState({}, '', full);
                 window.dispatchEvent(new PopStateEvent('popstate'));
             } else {
                 const base = window.location.href.split('#')[0];
-                window.location.replace(`${base}#${path}`);
+                window.location.replace(`${base}#${full}`);
             }
         },
         back() {
@@ -138,10 +147,31 @@ export function createRouter(routes: RouteConfig[], options: {
     return router;
 }
 
+function buildUrl(path: string, query?: Record<string, string>): string {
+    if (!query || !Object.keys(query).length) return path;
+    return `${path}?${new URLSearchParams(query).toString()}`;
+}
+
+function parseQuery(search: string): Record<string, string> {
+    if (!search) return {};
+    const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+    const out: Record<string, string> = {};
+    params.forEach((v, k) => { out[k] = v; });
+    return out;
+}
+
 export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn, name = 'default', onFirstRender?: () => void): () => void {
-    const getCurrentPath = () => router.mode === 'history'
-        ? window.location.pathname
-        : window.location.hash.slice(1) || '/';
+    const getCurrentPath = () => {
+        if (router.mode === 'history') return window.location.pathname;
+        const hash = window.location.hash.slice(1) || '/';
+        return hash.split('?')[0] || '/';
+    };
+    const getCurrentQuery = () => {
+        if (router.mode === 'history') return parseQuery(window.location.search);
+        const hash = window.location.hash.slice(1) || '/';
+        const qIdx = hash.indexOf('?');
+        return qIdx >= 0 ? parseQuery(hash.slice(qIdx + 1)) : {};
+    };
 
     if (router.transition) injectTransitionStyles();
 
@@ -171,14 +201,24 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
 
     const mountWithLoading = async (route: RouteConfig, routeComp: ComponentConfig | LazyComponent, routeMatch: RouteMatch, layout?: string, childRouter?: Router): Promise<RouteActivation> => {
         const isFirstLoad = typeof routeComp === 'function' && !lazyCache.has(routeComp as LazyComponent);
-        if (isFirstLoad && route.loadingTemplate) el.innerHTML = route.loadingTemplate;
-        const config = await resolveComponent(routeComp);
-        if (isFirstLoad && route.loadingTemplate) el.innerHTML = '';
+        const asyncOpts = isFirstLoad ? (routeComp as any).__asyncOptions : undefined;
+        const loadingHtml = route.loadingTemplate ?? asyncOpts?.loadingTemplate;
+        if (isFirstLoad && loadingHtml) el.innerHTML = loadingHtml;
+        let config: ComponentConfig;
+        try {
+            config = await resolveComponent(routeComp);
+        } catch (err) {
+            const errorHtml = asyncOpts?.errorTemplate;
+            if (errorHtml) { el.innerHTML = errorHtml; return { destroy: () => { el.innerHTML = ''; } }; }
+            throw err;
+        }
+        if (isFirstLoad && loadingHtml) el.innerHTML = '';
         return mount(el, config, routeMatch, layout, childRouter);
     };
 
     const render = async () => {
         const path = getCurrentPath();
+        const query = getCurrentQuery();
 
         for (const route of router.routes) {
             // --- Nested routes ---
@@ -188,10 +228,10 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                     for (const child of route.children) {
                         const childParams = matchRoute(child.path, path);
                         if (childParams !== null) {
-                            const routeMatch: RouteMatch = { params: prefixMatch.params, path, meta: route.meta };
+                            const routeMatch: RouteMatch = { params: prefixMatch.params, query, path, meta: route.meta };
 
                             if (child.redirect) {
-                                const childMatch: RouteMatch = { params: childParams, path, meta: child.meta };
+                                const childMatch: RouteMatch = { params: childParams, query, path, meta: child.meta };
                                 const target = typeof child.redirect === 'function' ? child.redirect(childMatch) : child.redirect;
                                 router.navigate(target);
                                 return;
@@ -206,7 +246,7 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                                 if (r) { router.navigate(r); return; }
                             }
                             if (child.beforeEnter) {
-                                const childMatch: RouteMatch = { params: childParams, path, meta: child.meta };
+                                const childMatch: RouteMatch = { params: childParams, query, path, meta: child.meta };
                                 const r = await runGuard(child.beforeEnter, childMatch);
                                 if (r) { router.navigate(r); return; }
                             }
@@ -214,6 +254,9 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                             const parentKey = `${route.path}::${JSON.stringify(prefixMatch.params)}`;
 
                             if (currentParentKey !== parentKey) {
+                                const compLeaveRedirect = await runComponentLeaveGuard(prevActivation, routeMatch);
+                                if (compLeaveRedirect) { router.navigate(compLeaveRedirect); return; }
+
                                 const transitionName = route.transition ?? router.transition;
                                 if (transitionName && el.hasChildNodes()) await animateEl(el, transitionName, 'leave');
                                 leaveEl(prevRouteConfig);
@@ -227,12 +270,13 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                                         beforeEach: router.beforeEach,
                                         afterEach: router.afterEach,
                                         scrollBehavior: router.scrollBehavior,
-                                        navigate: (p) => router.navigate(p),
-                                        replace: (p) => router.replace(p),
+                                        navigate: (p, o) => router.navigate(p, o),
+                                        replace: (p, o) => router.replace(p, o),
                                         back: () => router.back(),
                                         forward: () => router.forward(),
                                     };
                                     prevActivation = await mountWithLoading(route, routeComp, routeMatch, name === 'default' ? route.layout : undefined, name === 'default' ? childRouter : undefined);
+                                    prevActivation.enter?.(prevRouteMatch);
                                 } else {
                                     el.innerHTML = '';
                                 }
@@ -240,7 +284,7 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                                 if (transitionName) await animateEl(el, transitionName, 'enter');
                             }
 
-                            const combined: RouteMatch = { params: { ...prefixMatch.params, ...childParams }, path, meta: child.meta ?? route.meta };
+                            const combined: RouteMatch = { params: { ...prefixMatch.params, ...childParams }, query, path, meta: child.meta ?? route.meta };
                             router.afterEach?.(combined, prevRouteMatch);
                             const scrollPos = router.scrollBehavior?.(combined, prevRouteMatch);
                             if (scrollPos) window.scrollTo(scrollPos.x ?? 0, scrollPos.y ?? 0);
@@ -257,7 +301,7 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
             const params = matchRoute(route.path, path);
             if (params !== null) {
                 currentParentKey = null;
-                const routeMatch: RouteMatch = { params, path, meta: route.meta };
+                const routeMatch: RouteMatch = { params, query, path, meta: route.meta };
 
                 if (route.redirect) {
                     const target = typeof route.redirect === 'function' ? route.redirect(routeMatch) : route.redirect;
@@ -274,6 +318,9 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                     if (r) { router.navigate(r); return; }
                 }
 
+                const compLeaveRedirect = await runComponentLeaveGuard(prevActivation, routeMatch);
+                if (compLeaveRedirect) { router.navigate(compLeaveRedirect); return; }
+
                 const transitionName = route.transition ?? router.transition;
                 if (transitionName && el.hasChildNodes()) await animateEl(el, transitionName, 'leave');
                 leaveEl(prevRouteConfig);
@@ -288,7 +335,9 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                         prevActivation.activate?.();
                         keepAliveCache.delete(cacheKey);
                     } else {
+                        const fromRoute = prevRouteMatch;
                         prevActivation = await mountWithLoading(route, routeComp, routeMatch, name === 'default' ? route.layout : undefined);
+                        prevActivation.enter?.(fromRoute);
                     }
                 } else {
                     el.innerHTML = '';
