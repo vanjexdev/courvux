@@ -497,6 +497,9 @@ async function walk(el, state, context) {
                   ...indexVar ? { [indexVar]: index } : {}
                 });
                 const mergedItemState = new Proxy({}, {
+                  has(_, key) {
+                    return true;
+                  },
                   get(_, key) {
                     if (typeof key !== "string") return state[key];
                     if (key === itemVar || indexVar && key === indexVar) return itemReactive[key];
@@ -530,15 +533,18 @@ async function walk(el, state, context) {
                     return unsub;
                   }
                 };
-                await walk(clone, mergedItemState, childCtx);
-                if (forTransition) clone.classList.add(`${forTransition}-enter`);
+                const tempFrag = document.createDocumentFragment();
+                tempFrag.appendChild(clone);
+                await walk(tempFrag, mergedItemState, childCtx);
+                const actualEl = tempFrag.firstChild ?? clone;
+                if (forTransition) actualEl.classList.add(`${forTransition}-enter`);
                 keyNodeMap.set(k, {
-                  el: clone,
+                  el: actualEl,
                   reactive: itemReactive,
                   itemRef: item,
                   destroy: () => perItemUnsubs.forEach((u) => u())
                 });
-                if (forTransition) enterEls.push(clone);
+                if (forTransition) enterEls.push(actualEl);
               }
             }
             let cursor = anchor.nextSibling;
@@ -591,9 +597,12 @@ async function walk(el, state, context) {
             };
             for (const [item, index] of entries) {
               const clone = element.cloneNode(true);
-              await walk(clone, makeItemState(state, item, itemVar, index, indexVar), childContext);
-              parent.insertBefore(clone, insertBefore);
-              rendered.push(clone);
+              const tempFrag = document.createDocumentFragment();
+              tempFrag.appendChild(clone);
+              await walk(tempFrag, makeItemState(state, item, itemVar, index, indexVar), childContext);
+              const actualEl = tempFrag.firstChild ?? clone;
+              parent.insertBefore(tempFrag, insertBefore);
+              rendered.push(actualEl);
             }
           }
         };

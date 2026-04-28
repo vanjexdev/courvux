@@ -439,6 +439,7 @@ export async function walk(el: Node, state: any, context: WalkContext) {
 
                                 // Proxy: itemVar/indexVar → per-item reactive scope; rest → parent state
                                 const mergedItemState = new Proxy({} as any, {
+                                    has(_, key: string) { return true; },
                                     get(_, key: string) {
                                         if (typeof key !== 'string') return (state as any)[key];
                                         if (key === itemVar || (indexVar && key === indexVar)) return itemReactive[key];
@@ -473,15 +474,20 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                                     }
                                 };
 
-                                await walk(clone, mergedItemState, childCtx);
-                                if (forTransition) clone.classList.add(`${forTransition}-enter`);
+                                // Walk a fragment so that special root elements (router-link,
+                                // custom components) get processed — walk() only visits childNodes.
+                                const tempFrag = document.createDocumentFragment();
+                                tempFrag.appendChild(clone);
+                                await walk(tempFrag, mergedItemState, childCtx);
+                                const actualEl = (tempFrag.firstChild ?? clone) as HTMLElement;
+                                if (forTransition) actualEl.classList.add(`${forTransition}-enter`);
                                 keyNodeMap.set(k, {
-                                    el: clone,
+                                    el: actualEl,
                                     reactive: itemReactive,
                                     itemRef: item,
                                     destroy: () => perItemUnsubs.forEach(u => u())
                                 });
-                                if (forTransition) enterEls.push(clone);
+                                if (forTransition) enterEls.push(actualEl);
                             }
                         }
 
@@ -543,9 +549,12 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                         };
                         for (const [item, index] of entries) {
                             const clone = element.cloneNode(true) as HTMLElement;
-                            await walk(clone, makeItemState(state, item, itemVar, index, indexVar), childContext);
-                            parent.insertBefore(clone, insertBefore);
-                            rendered.push(clone);
+                            const tempFrag = document.createDocumentFragment();
+                            tempFrag.appendChild(clone);
+                            await walk(tempFrag, makeItemState(state, item, itemVar, index, indexVar), childContext);
+                            const actualEl = (tempFrag.firstChild ?? clone) as HTMLElement;
+                            parent.insertBefore(tempFrag, insertBefore);
+                            rendered.push(actualEl);
                         }
                     }
                 };

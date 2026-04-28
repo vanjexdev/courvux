@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "prismjs/themes/prism-tomorrow.css";
+
+@theme {
+    --font-family-mono: 'JetBrains Mono', monospace;
+    --font-family-sans: 'JetBrains Mono', monospace;
+}
+
+* { font-family: 'JetBrains Mono', monospace; }
+
+body {
+    background: #f9f9f9;
+    color: #111;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Sidebar nav links */
+.nav-link {
+    display: block;
+    padding: 5px 12px;
+    font-size: 13px;
+    color: #555;
+    border-radius: 5px;
+    text-decoration: none;
+    transition: background 0.12s, color 0.12s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.nav-link:hover { background: #f0f0f0; color: #111; }
+.nav-link.active { background: #111; color: #fff; }
+
+/* Prose content */
+.prose h1 { font-size: 1.6rem; font-weight: 700; margin-bottom: 0.5rem; color: #111; }
+.prose h2 { font-size: 1.15rem; font-weight: 600; margin-top: 2.5rem; margin-bottom: 0.75rem; color: #111; border-bottom: 1px solid #e8e8e8; padding-bottom: 0.4rem; }
+.prose h3 { font-size: 0.95rem; font-weight: 600; margin-top: 1.75rem; margin-bottom: 0.5rem; color: #333; }
+.prose p { font-size: 0.875rem; line-height: 1.7; color: #333; margin-bottom: 0.75rem; }
+.prose ul { font-size: 0.875rem; line-height: 1.7; color: #333; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+.prose li { margin-bottom: 0.25rem; }
+.prose :not(pre) > code { background: #f0f0f0; border: 1px solid #e0e0e0; padding: 1px 5px; border-radius: 3px; font-size: 0.8rem; color: #111; }
+.prose a { color: #111; text-decoration: underline; text-underline-offset: 3px; }
+.prose a:hover { color: #555; }
+.prose table { width: 100%; border-collapse: collapse; font-size: 0.8rem; margin-bottom: 1rem; }
+.prose th { background: #f0f0f0; padding: 8px 12px; text-align: left; border: 1px solid #e0e0e0; font-weight: 600; }
+.prose td { padding: 8px 12px; border: 1px solid #e0e0e0; color: #333; vertical-align: top; }
+.prose tr:nth-child(even) td { background: #fafafa; }
+
+/* Code blocks */
+.code-block { border-radius: 8px; overflow: hidden; margin: 1rem 0; border: 1px solid #2d2d2d; background: #1e1e1e; }
+.code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #161616;
+    padding: 7px 14px;
+    border-bottom: 1px solid #2d2d2d;
+}
+.code-lang { font-size: 11px; color: #666; letter-spacing: 0.05em; font-weight: 500; }
+.copy-btn {
+    font-size: 11px;
+    color: #666;
+    background: none;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 2px 9px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color 0.12s, border-color 0.12s;
+    letter-spacing: 0.02em;
+}
+.copy-btn:hover { color: #ccc; border-color: #555; }
+.code-block pre[class*="language-"] {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    font-size: 13px !important;
+    line-height: 1.65 !important;
+    padding: 1.1rem 1.4rem !important;
+    background: #1e1e1e !important;
+    tab-size: 4;
+}
+.code-block code[class*="language-"] { font-family: 'JetBrains Mono', monospace !important; font-size: 13px !important; }
+
+/* Source tabs */
+.src-tab {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-family: inherit;
+    background: transparent;
+    border: 1px solid #ddd;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    color: #888;
+}
+.src-tab.active { background: #1e1e1e; color: #ccc; border-color: #2d2d2d; }
+.src-tab:not(.active):hover { color: #444; background: #f5f5f5; }
+
+/* Badge */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background: #f0f0f0; color: #555; border: 1px solid #ddd; }
+
+/* Callout boxes */
+.callout { border-left: 3px solid #ccc; padding: 10px 14px; background: #f8f8f8; border-radius: 0 6px 6px 0; margin: 1rem 0; font-size: 0.85rem; color: #444; }
+.callout.info { border-color: #888; }
+.callout.warn { border-color: #bbb; background: #f5f5f0; }
+
+/* TODO Demo */
+.todo-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+.todo-item:last-child { border-bottom: none; }
+.todo-item.done label { text-decoration: line-through; color: #bbb; }
+.filter-btn { padding: 4px 12px; border-radius: 4px; font-size: 12px; border: 1px solid transparent; cursor: pointer; font-family: inherit; background: transparent; color: #555; }
+.filter-btn:hover { border-color: #ccc; }
+.filter-btn.active { border-color: #111; color: #111; font-weight: 600; }
