@@ -9,9 +9,9 @@ const NAV = [
         key: 'start',
         label: 'Getting Started',
         items: [
-            { to: '/',             label: 'Introduction' },
+            { to: '/', label: 'Introduction' },
             { to: '/installation', label: 'Installation' },
-            { to: '/quick-start',  label: 'Quick Start' },
+            { to: '/quick-start', label: 'Quick Start' },
         ]
     },
     {
@@ -27,7 +27,7 @@ const NAV = [
         items: [
             { to: '/components', label: 'Components' },
             { to: '/reactivity', label: 'Reactivity' },
-            { to: '/lifecycle',  label: 'Lifecycle' },
+            { to: '/lifecycle', label: 'Lifecycle' },
         ]
     },
     {
@@ -35,7 +35,7 @@ const NAV = [
         label: 'Router & Store',
         items: [
             { to: '/router', label: 'Router' },
-            { to: '/store',  label: 'Store' },
+            { to: '/store', label: 'Store' },
         ]
     },
     {
@@ -144,12 +144,12 @@ createApp({
                            @mouseover="$event.target.style.color='#111'"
                            @mouseout="$event.target.style.color='#888'"
                         >⬡ Issues / Support</a>
-                        <a href="https://github.com/sponsors/vanjexdev"
+                        <a href="https://ko-fi.com/vanjexdev"
                            target="_blank"
                            style="color:#888; text-decoration:none;"
                            @mouseover="$event.target.style.color='#111'"
                            @mouseout="$event.target.style.color='#888'"
-                        >♥ Sponsor</a>
+                        >♥ Buy me a coffee</a>
                     </div>
                 </div>
             </aside>
