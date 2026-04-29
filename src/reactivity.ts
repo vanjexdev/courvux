@@ -1,5 +1,11 @@
 const ARRAY_MUTATING = new Set(['push', 'pop', 'shift', 'unshift', 'splice', 'sort', 'reverse']);
 
+const SKIP_PROXY = (v: any): boolean =>
+    v instanceof Date || v instanceof RegExp ||
+    v instanceof Map  || v instanceof Set    ||
+    v instanceof WeakMap || v instanceof WeakSet ||
+    ArrayBuffer.isView(v) || v instanceof ArrayBuffer;
+
 const _rawSet = new WeakSet<object>();
 export const markRaw = <T extends object>(obj: T): T => { _rawSet.add(obj); return obj; };
 export const isRaw = (obj: object): boolean => _rawSet.has(obj);
@@ -45,7 +51,7 @@ export function batchUpdate(fn: () => void): void {
 }
 
 function makeDeepProxy(val: any, notify: () => void): any {
-    if (val === null || typeof val !== 'object' || _rawSet.has(val)) return val;
+    if (val === null || typeof val !== 'object' || _rawSet.has(val) || SKIP_PROXY(val)) return val;
     return new Proxy(val, {
         get(t, k) {
             // Propagate RAW_SYMBOL upward so toRaw() can fully unwrap nested proxies
@@ -104,7 +110,7 @@ export function createReactivityScope() {
                     _activeEffect.push({ sub: subscribe, key });
                 }
                 const val = target[key as keyof T];
-                if (typeof key === 'string' && !key.startsWith('$') && val !== null && typeof val === 'object' && !_rawSet.has(val as object)) {
+                if (typeof key === 'string' && !key.startsWith('$') && val !== null && typeof val === 'object' && !_rawSet.has(val as object) && !SKIP_PROXY(val)) {
                     return makeDeepProxy(val, () => notifyKey(key));
                 }
                 return val;

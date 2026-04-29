@@ -1,5 +1,6 @@
 // src/reactivity.ts
 var ARRAY_MUTATING = /* @__PURE__ */ new Set(["push", "pop", "shift", "unshift", "splice", "sort", "reverse"]);
+var SKIP_PROXY = (v) => v instanceof Date || v instanceof RegExp || v instanceof Map || v instanceof Set || v instanceof WeakMap || v instanceof WeakSet || ArrayBuffer.isView(v) || v instanceof ArrayBuffer;
 var _rawSet = /* @__PURE__ */ new WeakSet();
 var RAW_SYMBOL = /* @__PURE__ */ Symbol("raw");
 var toRaw = (obj) => {
@@ -34,7 +35,7 @@ function batchUpdate(fn) {
   }
 }
 function makeDeepProxy(val, notify) {
-  if (val === null || typeof val !== "object" || _rawSet.has(val)) return val;
+  if (val === null || typeof val !== "object" || _rawSet.has(val) || SKIP_PROXY(val)) return val;
   return new Proxy(val, {
     get(t, k) {
       if (k === RAW_SYMBOL) return t[RAW_SYMBOL] ?? t;
@@ -89,7 +90,7 @@ function createReactivityScope() {
           _activeEffect.push({ sub: subscribe, key });
         }
         const val = target[key];
-        if (typeof key === "string" && !key.startsWith("$") && val !== null && typeof val === "object" && !_rawSet.has(val)) {
+        if (typeof key === "string" && !key.startsWith("$") && val !== null && typeof val === "object" && !_rawSet.has(val) && !SKIP_PROXY(val)) {
           return makeDeepProxy(val, () => notifyKey(key));
         }
         return val;
@@ -2152,7 +2153,8 @@ async function mount(el, config, appContext) {
         const rawDeps = collectDeps(() => {
           try {
             computedValue = getter.call(state);
-          } catch {
+          } catch (e) {
+            if (config.debug ?? appContext.debug) console.warn("[courvux] computed error:", e);
           }
         });
         state[key] = computedValue;

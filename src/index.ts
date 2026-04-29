@@ -188,7 +188,7 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
                 // causing downstream DOM callbacks to pollute deps → computed subscribes to
                 // its own output key → infinite loop.
                 let computedValue: any;
-                const rawDeps = collectDeps(() => { try { computedValue = getter.call(state); } catch { /* */ } });
+                const rawDeps = collectDeps(() => { try { computedValue = getter.call(state); } catch (e) { if ((config as any).debug ?? (appContext as any).debug) console.warn('[courvux] computed error:', e); } });
                 (state as any)[key] = computedValue;
                 const seen = new Map<Function, Set<string>>();
                 for (const { sub, key: k } of rawDeps) {
