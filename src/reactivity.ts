@@ -47,16 +47,18 @@ export function batchUpdate(fn: () => void): void {
 function makeDeepProxy(val: any, notify: () => void): any {
     if (val === null || typeof val !== 'object' || _rawSet.has(val)) return val;
     return new Proxy(val, {
-        get(t, k: string) {
-            if (Array.isArray(t) && ARRAY_MUTATING.has(k)) {
+        get(t, k) {
+            // Propagate RAW_SYMBOL upward so toRaw() can fully unwrap nested proxies
+            if (k === RAW_SYMBOL) return (t as any)[RAW_SYMBOL] ?? t;
+            if (typeof k === 'string' && Array.isArray(t) && ARRAY_MUTATING.has(k)) {
                 return (...args: any[]) => {
                     const result = (Array.prototype as any)[k].apply(t, args);
                     notify();
                     return result;
                 };
             }
-            const v = t[k];
-            if (v !== null && typeof v === 'object' && !_rawSet.has(v)) return makeDeepProxy(v, notify);
+            const v = (t as any)[k as string];
+            if (v !== null && typeof v === 'object' && !_rawSet.has(v as object)) return makeDeepProxy(v, notify);
             return v;
         },
         set(t, k: string, v) { t[k] = v; notify(); return true; }

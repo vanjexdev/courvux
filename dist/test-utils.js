@@ -2,6 +2,10 @@
 var ARRAY_MUTATING = /* @__PURE__ */ new Set(["push", "pop", "shift", "unshift", "splice", "sort", "reverse"]);
 var _rawSet = /* @__PURE__ */ new WeakSet();
 var RAW_SYMBOL = /* @__PURE__ */ Symbol("raw");
+var toRaw = (obj) => {
+  if (obj === null || typeof obj !== "object") return obj;
+  return obj[RAW_SYMBOL] ?? obj;
+};
 var _batchDepth = 0;
 var _batchQueue = /* @__PURE__ */ new Map();
 var _activeEffect = null;
@@ -33,7 +37,8 @@ function makeDeepProxy(val, notify) {
   if (val === null || typeof val !== "object" || _rawSet.has(val)) return val;
   return new Proxy(val, {
     get(t, k) {
-      if (Array.isArray(t) && ARRAY_MUTATING.has(k)) {
+      if (k === RAW_SYMBOL) return t[RAW_SYMBOL] ?? t;
+      if (typeof k === "string" && Array.isArray(t) && ARRAY_MUTATING.has(k)) {
         return (...args) => {
           const result = Array.prototype[k].apply(t, args);
           notify();
@@ -2418,7 +2423,7 @@ function createMountElement(appContext) {
       const colonIdx = cvModelAttr.name.indexOf(":");
       const propName = colonIdx >= 0 ? cvModelAttr.name.slice(colonIdx + 1).split(".")[0] : "modelValue";
       const emitEvent = propName === "modelValue" ? "update:modelValue" : `update:${propName}`;
-      props[propName] = evaluate(modelExpr, parentState);
+      props[propName] = toRaw(evaluate(modelExpr, parentState));
       propBindings.push({ propName, expr: modelExpr });
       emitHandlers[emitEvent] = (newVal) => {
         setStateValue(modelExpr, parentState, newVal);
@@ -2442,7 +2447,7 @@ function createMountElement(appContext) {
       if (attr.name.startsWith(":")) {
         const propName = attr.name.slice(1);
         const expr = attr.value;
-        props[propName] = evaluate(expr, parentState);
+        props[propName] = toRaw(evaluate(expr, parentState));
         propBindings.push({ propName, expr });
       } else if (attr.name.startsWith("@") || attr.name.startsWith("cv:on:")) {
         const eventName = attr.name.startsWith("@") ? attr.name.slice(1) : attr.name.slice(6);
@@ -2514,7 +2519,7 @@ function createMountElement(appContext) {
     if (childState) {
       propBindings.forEach(({ propName, expr }) => {
         subscribeExpr(expr, { ...parentContext, subscribe: parentContext.subscribe }, () => {
-          childState[propName] = evaluate(expr, parentState);
+          childState[propName] = toRaw(evaluate(expr, parentState));
         });
       });
       if (compRefName && parentContext.refs) {

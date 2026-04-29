@@ -1,5 +1,5 @@
 import { AppConfig, ComponentConfig, RouteMatch, Router, WatcherOptions, DirectiveDef, DirectiveShorthand, ComputedDef, LazyComponent } from './types.js';
-import { createReactivityScope, batchUpdate, collectDeps, markRaw } from './reactivity.js';
+import { createReactivityScope, batchUpdate, collectDeps, markRaw, toRaw } from './reactivity.js';
 import { walk, WalkContext, evaluate, subscribeExpr, subscribeDeps, setStateValue, injectCloakStyle } from './dom.js';
 import { setupRouterView, RouteActivation } from './router.js';
 import { setupDevTools, nextDevToolsId, DevToolsStoreEntry } from './devtools.js';
@@ -481,7 +481,7 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
                 const colonIdx = cvModelAttr.name.indexOf(':');
                 const propName = colonIdx >= 0 ? cvModelAttr.name.slice(colonIdx + 1).split('.')[0] : 'modelValue';
                 const emitEvent = propName === 'modelValue' ? 'update:modelValue' : `update:${propName}`;
-                props[propName] = evaluate(modelExpr, parentState);
+                props[propName] = toRaw(evaluate(modelExpr, parentState));
                 propBindings.push({ propName, expr: modelExpr });
                 emitHandlers[emitEvent] = (newVal: any) => { setStateValue(modelExpr, parentState, newVal); };
             });
@@ -506,7 +506,7 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
             if (attr.name.startsWith(':')) {
                 const propName = attr.name.slice(1);
                 const expr = attr.value;
-                props[propName] = evaluate(expr, parentState);
+                props[propName] = toRaw(evaluate(expr, parentState));
                 propBindings.push({ propName, expr });
             } else if (attr.name.startsWith('@') || attr.name.startsWith('cv:on:')) {
                 const eventName = attr.name.startsWith('@') ? attr.name.slice(1) : attr.name.slice(6);
@@ -582,7 +582,7 @@ function createMountElement(appContext: AppContext): AppContext['mountElement'] 
         if (childState) {
             propBindings.forEach(({ propName, expr }) => {
                 subscribeExpr(expr, { ...parentContext, subscribe: parentContext.subscribe }, () => {
-                    childState[propName] = evaluate(expr, parentState);
+                    childState[propName] = toRaw(evaluate(expr, parentState));
                 });
             });
             if (compRefName && parentContext.refs) {
