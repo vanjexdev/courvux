@@ -677,9 +677,12 @@ async function walk(el, state, context) {
             for (const branch of chain) {
               if (branch.condition === null || !!evaluate(branch.condition, state)) {
                 const clone = branch.template.cloneNode(true);
-                await walk(clone, state, context);
-                branch.anchor.parentNode?.insertBefore(clone, branch.anchor.nextSibling);
-                activeClone = clone;
+                const frag = document.createDocumentFragment();
+                frag.appendChild(clone);
+                await walk(frag, state, context);
+                const actualEl = frag.firstChild ?? clone;
+                branch.anchor.parentNode?.insertBefore(frag, branch.anchor.nextSibling);
+                activeClone = actualEl;
                 break;
               }
             }

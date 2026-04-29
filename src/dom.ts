@@ -626,9 +626,12 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                         for (const branch of chain) {
                             if (branch.condition === null || !!evaluate(branch.condition, state)) {
                                 const clone = branch.template.cloneNode(true) as HTMLElement;
-                                await walk(clone, state, context);
-                                branch.anchor.parentNode?.insertBefore(clone, branch.anchor.nextSibling);
-                                activeClone = clone;
+                                const frag = document.createDocumentFragment();
+                                frag.appendChild(clone);
+                                await walk(frag, state, context);
+                                const actualEl = (frag.firstChild ?? clone) as HTMLElement;
+                                branch.anchor.parentNode?.insertBefore(frag, branch.anchor.nextSibling);
+                                activeClone = actualEl;
                                 break;
                             }
                         }
