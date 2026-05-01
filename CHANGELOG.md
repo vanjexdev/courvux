@@ -5,6 +5,17 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.2] — 2026-05-01
+
+### Performance fixes
+
+#### DevTools overlay drag forced reflow (~64ms)
+**File:** `src/overlay.ts`
+Lighthouse `forced-reflow-insight` flagged two `getBoundingClientRect()` calls inside the panel-drag `mousedown` handler. Each call forces the browser to flush pending style/layout before returning dimensions; doing two back-to-back compounds the cost (~64ms in the audit).
+**Fix:** Switch to `pointerdown` / `pointermove` with `setPointerCapture`. Capture the cursor and the panel's position once (`offsetLeft`/`offsetTop`) at drag start; subsequent `pointermove` writes only set `style.left/top` from cached values + cursor delta — no layout reads during drag. Listeners are scoped to the head element via pointer capture so they auto-clean on release/cancel.
+
+---
+
 ## [0.4.1] — 2026-05-01
 
 ### Documentation
