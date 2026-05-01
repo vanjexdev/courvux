@@ -19,7 +19,7 @@ Lightweight reactive UI framework for the browser. No virtual DOM. ~20.7 KB gzip
 | Examples | `/home/jesusuzcategui/WorkspaceNode/cv-framework/examples/` |
 | Changelog | `/home/jesusuzcategui/WorkspaceNode/cv-framework/CHANGELOG.md` |
 | Benchmarks | `/home/jesusuzcategui/WorkspaceNode/cv-framework/BENCHMARKS.md` |
-| Current version | **0.4.0** |
+| Current version | **0.4.2** |
 | Repo | `https://github.com/vanjexdev/courvux` |
 | Live docs | `https://vanjexdev.github.io/courvux/` |
 
@@ -506,7 +506,7 @@ Only **top-level** `[cv-data]` elements are walked — nested ones are handled b
 
 ---
 
-## Top-level exports (v0.4.0)
+## Top-level exports (v0.4.2)
 
 **App**: `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
 **Router/Store**: `createRouter`, `createStore`

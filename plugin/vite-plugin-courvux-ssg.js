@@ -43,6 +43,7 @@
 
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
 
 const DEFAULT_TEMPLATE = `<!doctype html>
 <html>
@@ -106,7 +107,9 @@ export default function courvuxSsg(options = {}) {
             } else {
                 const viteIndexPath = path.join(resolvedOutDir, 'index.html');
                 try {
-                    const viteIndex = await fs.readFile(viteIndexPath, 'utf-8');
+                    let viteIndex = await fs.readFile(viteIndexPath, 'utf-8');
+                    // Inline CSS to eliminate render-blocking <link> request
+                    viteIndex = await inlineCss(viteIndex, resolvedOutDir);
                     resolvedTemplate = adaptViteIndex(viteIndex, mountId);
                 } catch {
                     console.log(`[courvux-ssg] No Vite-emitted index.html found, using default minimal shell.`);
@@ -323,4 +326,40 @@ function adaptViteIndex(html, mountId) {
     out = out.replace('</head>', '    %head%\n</head>');
 
     return out;
+}
+
+/**
+ * Find CSS <link> tags in the HTML and replace them with inline <style> tags.
+ * Eliminates render-blocking CSS requests for small stylesheets.
+ */
+async function inlineCss(html, outDir) {
+    const cssLinkRe = /<link\s+[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["'][^>]*\s*\/?>/gi;
+    let match;
+    while ((match = cssLinkRe.exec(html)) !== null) {
+        const fullTag = match[0];
+        let href = match[1];
+        // Skip external URLs (Google Fonts, CDN, etc.)
+        if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//')) continue;
+        // Strip base path if present (e.g. /courvux/assets/... -> assets/...)
+        // The href is URL-path relative, but files are at outDir directly
+        if (href.startsWith('/')) {
+            href = href.replace(/^\//, '');
+            // Remove the Vite base path segment (first directory component)
+            // if it doesn't match a real subdirectory in outDir
+            const parts = href.split('/');
+            if (parts.length > 1 && !fsSync.existsSync(path.join(outDir, parts[0]))) {
+                href = parts.slice(1).join('/');
+            }
+        }
+        const cssPath = path.join(outDir, href);
+        try {
+            const css = fsSync.readFileSync(cssPath, 'utf-8');
+            const replacement = `<style>${css}</style>`;
+            html = html.replace(fullTag, replacement);
+            console.log(`[courvux-ssg] Inlined CSS: ${match[1]} (${(css.length / 1024).toFixed(1)} KB)`);
+        } catch {
+            console.warn(`[courvux-ssg] Could not inline CSS ${match[1]} (file not found at ${cssPath}).`);
+        }
+    }
+    return html;
 }

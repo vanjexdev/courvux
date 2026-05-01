@@ -6,7 +6,7 @@ export default {
 pnpm add github:vanjexdev/courvux
 
 # Pin to a tagged release (recommended for production)
-pnpm add github:vanjexdev/courvux#v0.4.1`,
+pnpm add github:vanjexdev/courvux#v0.4.2`,
     s2: `<script type="importmap">
 {
   "imports": {
@@ -41,7 +41,7 @@ export default defineConfig({
 <script type="importmap">
 {
   "imports": {
-    "courvux": "https://cdn.jsdelivr.net/gh/vanjexdev/courvux@v0.4.1/dist/index.js"
+    "courvux": "https://cdn.jsdelivr.net/gh/vanjexdev/courvux@v0.4.2/dist/index.js"
   }
 }
 <\/script>

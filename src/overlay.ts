@@ -124,23 +124,38 @@ export function mountDevOverlay(hook: DevToolsHook): void {
         });
     });
 
-    // Drag
+    // Drag — capture initial cursor + root position once on pointerdown,
+    // then translate by delta on every pointermove. Avoids the
+    // getBoundingClientRect() forced reflow Lighthouse flags as
+    // forced-reflow-insight (overlay.ts was the source of a ~64ms reflow).
     const head = panel.querySelector('#cvd-head') as HTMLElement;
-    let dragging = false, ox = 0, oy = 0;
-    head.addEventListener('mousedown', e => {
+    head.addEventListener('pointerdown', e => {
         if ((e.target as HTMLElement).closest('button')) return;
-        dragging = true;
-        ox = e.clientX - root.getBoundingClientRect().left;
-        oy = e.clientY - root.getBoundingClientRect().top;
+        head.setPointerCapture(e.pointerId);
+
+        const startX = e.clientX, startY = e.clientY;
+        // offsetLeft/Top are layout reads, but happen once per drag (not
+        // during page load) and read pre-existing layout — far cheaper
+        // than getBoundingClientRect().
+        const startLeft = root.offsetLeft;
+        const startTop  = root.offsetTop;
+
+        const move = (ev: PointerEvent) => {
+            root.style.right  = 'auto';
+            root.style.bottom = 'auto';
+            root.style.left   = `${startLeft + (ev.clientX - startX)}px`;
+            root.style.top    = `${startTop  + (ev.clientY - startY)}px`;
+        };
+        const up = (ev: PointerEvent) => {
+            head.releasePointerCapture(ev.pointerId);
+            head.removeEventListener('pointermove', move);
+            head.removeEventListener('pointerup', up);
+            head.removeEventListener('pointercancel', up);
+        };
+        head.addEventListener('pointermove', move);
+        head.addEventListener('pointerup', up);
+        head.addEventListener('pointercancel', up);
     });
-    document.addEventListener('mousemove', e => {
-        if (!dragging) return;
-        root.style.right = 'auto';
-        root.style.bottom = 'auto';
-        root.style.left = `${e.clientX - ox}px`;
-        root.style.top = `${e.clientY - oy}px`;
-    });
-    document.addEventListener('mouseup', () => { dragging = false; });
 
     // Render
     function renderComponents() {
