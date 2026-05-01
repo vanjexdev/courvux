@@ -4,16 +4,41 @@ A small static blog built with `courvux/plugin/ssg`. Each post is pre-rendered t
 
 ## Run
 
+You have three options. The first two demonstrate the SSG pipeline; the third is a no-Vite fallback that runs the SPA only.
+
+### Option A — `pnpm dev` (recommended for development)
+
+From inside this directory:
+
 ```bash
 pnpm install      # symlinks courvux from the parent repo
 pnpm dev          # Vite dev server with HMR
-pnpm build        # produces dist/ — ready for any static host
+```
+
+Open the printed URL. Routes render dynamically; SSG does not run in dev mode.
+
+### Option B — `pnpm build && pnpm preview` (production simulation)
+
+```bash
+pnpm install
+pnpm build        # vite build + courvuxSsg → dist/<route>/index.html for every route
 pnpm preview      # serve the built dist/ locally
 ```
 
-> **Important:** run the commands from inside this directory (`examples/03-ssg-blog/`), not from the repo root. The example has its own `package.json` and depends on the local Courvux via `link:../..`.
+This is what GitHub Pages / Netlify / Cloudflare Pages will see: real per-route HTML files, sitemap, robots, 404.html. Open the printed URL and inspect `view-source:` on any route — title, description, OG, canonical are inlined.
 
-> **Don't try to open `index.html` directly with a plain static server from a parent directory** — the `<script type="module">` tag uses ES-module imports (e.g. `import { createApp } from 'courvux'`) which only resolve under Vite's dev/build pipeline.
+### Option C — Plain static server (no Node tooling)
+
+The `index.html` includes an importmap pointing to `../../dist/index.js`, so the source can also run under any plain static server **as long as it's served from the repo root** (so `../../dist/` is reachable from the example's URL).
+
+From the repo root:
+
+```bash
+npx serve .
+# Open http://localhost:3000/examples/03-ssg-blog/
+```
+
+> Option C runs the SPA **without pre-rendering** — every route resolves client-side. Use Option B to see what production-deployed HTML actually looks like.
 
 ## Structure
 
