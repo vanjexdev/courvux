@@ -14,6 +14,7 @@ export default defineConfig({
             // Reuse the same routes that the client router consumes
             routes: async () => (await import('./src/routes-data.js')).default,
             baseUrl: 'https://vanjexdev.github.io/courvux',
+            notFound: async () => (await import('./src/pages/NotFound.js')).default,
         }),
     ],
     resolve: {

@@ -65,6 +65,7 @@ export default function courvuxSsg(options = {}) {
         mountId = 'app',
         sitemap = true,
         skipDuringDev = true,
+        notFound,
     } = options;
 
     if (typeof routes !== 'function') {
@@ -180,6 +181,25 @@ export default function courvuxSsg(options = {}) {
                 console.log('[courvux-ssg] Skipping sitemap.xml (provide `baseUrl` to enable).');
             }
 
+            // Emit 404.html when a notFound component is provided. GitHub
+            // Pages, Netlify, Cloudflare Pages, etc. serve this file for
+            // unknown paths so the SPA can hydrate and render the wildcard.
+            if (notFound) {
+                try {
+                    await emit404({
+                        component: notFound,
+                        template: resolvedTemplate,
+                        mountId,
+                        outDir: resolvedOutDir,
+                        renderPage,
+                        renderHeadToString,
+                    });
+                    console.log(`[courvux-ssg] ✓ 404.html`);
+                } catch (err) {
+                    console.error(`[courvux-ssg] ✗ 404.html — ${err.message}`);
+                }
+            }
+
             console.log(`[courvux-ssg] Emitted ${emitted.length} route(s).`);
         },
     };
@@ -225,6 +245,20 @@ async function emitRoute({
         : path.join(outDir, targetPath.replace(/^\//, ''));
     await fs.mkdir(fileDir, { recursive: true });
     await fs.writeFile(path.join(fileDir, 'index.html'), finalHtml, 'utf-8');
+}
+
+async function emit404({ component, template, mountId, outDir, renderPage, renderHeadToString }) {
+    const resolved = typeof component === 'function'
+        ? (await component()).default ?? (await component())
+        : component;
+
+    const result = await renderPage(resolved);
+    const headHtml = renderHeadToString(result.head);
+    const finalHtml = template
+        .replaceAll('%head%', headHtml)
+        .replaceAll('%app%',  result.html)
+        .replaceAll('%mountId%', mountId);
+    await fs.writeFile(path.join(outDir, '404.html'), finalHtml, 'utf-8');
 }
 
 async function emitSitemap(outDir, paths, baseUrl) {

@@ -41,6 +41,10 @@ The SSG/SSR head buffer is now stored at `globalThis.__COURVUX_HEAD_COLLECTOR__`
 **File:** `plugin/vite-plugin-courvux-ssg.js`
 By default, the plugin now reads the Vite-emitted `<outDir>/index.html` and uses it as the page shell — preserving hashed asset paths automatically. It strips per-page-overridable head tags (`<title>`, `<meta name="description">`, `<meta property="og:*">`, `<link rel="canonical">`) so the SSG-injected metadata does not duplicate the shell's. An explicit `template` option still overrides this behavior.
 
+#### SSG plugin `notFound` option for `404.html`
+**File:** `plugin/vite-plugin-courvux-ssg.js`
+New plugin option: `notFound: ComponentConfig | () => Promise<{default: ComponentConfig}>`. When provided, the plugin renders this component the same way as a regular route and writes the result to `<outDir>/404.html`. Static hosts (GitHub Pages, Netlify, Cloudflare Pages) serve this file for any unknown path, allowing the SPA to hydrate over a real 404 view instead of falling back to the host's generic page.
+
 ---
 
 ## [0.3.0] — 2026-04-29
