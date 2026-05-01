@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-DaPEsSBI.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-C22xiKCb.css">
+    <title>Demo — TODO App — Courvux</title>
+    <meta name="description" content="Interactive TODO app built with Courvux. Live demo with full source code (JS + HTML).">
+    <meta property="og:title" content="Demo — TODO App — Courvux">
+    <meta property="og:description" content="Interactive TODO app built with Courvux. Live demo with full source code (JS + HTML).">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/demo">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Demo — TODO App — Courvux">
+    <meta name="twitter:description" content="Interactive TODO app built with Courvux. Live demo with full source code (JS + HTML).">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/demo">
+</head>
+<body>
+    <div id="app">
+        <div style="max-width: 600px;" data-courvux-ssr="true">
+            <!-- Header -->
+            <div style="margin-bottom: 2rem;">
+                <h1 style="font-size:1.6rem; font-weight:700; margin:0 0 6px;">TODO Demo</h1>
+                <p style="font-size:13px; color:#666; margin:0;">
+                    Powered by Courvux — reactivity, computed, watchers, and localStorage persistence.
+                </p>
+            </div>
+
+            <!-- Input -->
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+                <input @keydown.enter="add()" placeholder="What needs to be done?" style="flex:1; padding:10px 14px; border:1px solid #ddd; border-radius:6px; font-family:inherit; font-size:13px; outline:none;" @focus="$event.target.style.borderColor='#111'" @blur="$event.target.style.borderColor='#ddd'">
+                <button @click="add()" style="padding:10px 18px; background:#111; color:#fff; border:none; border-radius:6px; font-family:inherit; font-size:13px; cursor:pointer;">Add</button>
+            </div>
+
+            <!-- Bulk actions row -->
+            <!--cv-if-->
+
+            <!-- List -->
+            <div style="border:1px solid #e8e8e8; border-radius:8px; background:#fff; overflow:hidden; margin-bottom:12px;">
+                <!--cv-if--><div style="padding:24px; text-align:center; color:#bbb; font-size:13px;">
+                    Add a task above.
+                </div>
+
+                <!--cv-for: filteredTodos-->
+            </div>
+
+            <!-- Filter + clear row -->
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; gap:4px;">
+                    <button class="filter-btn active" :class="{ active: filter === 'all' }" @click="setFilter('all')">All</button>
+                    <button class="filter-btn" :class="{ active: filter === 'active' }" @click="setFilter('active')">Active</button>
+                    <button class="filter-btn" :class="{ active: filter === 'completed' }" @click="setFilter('completed')">Completed</button>
+                </div>
+                <button @click="clearCompleted()" style="background: none none; border: none none; font-size: 12px; color: #999; cursor: pointer; font-family: inherit; padding: 4px 8px; display: none;" @mouseover="$event.target.style.color='#111'" @mouseout="$event.target.style.color='#999'">Clear completed</button>
+            </div>
+
+            <!-- Persistence note -->
+            <p style="margin-top:20px; font-size:11px; color:#bbb; text-align:center;">
+                Tasks are saved to <code style="font-size:10px;">localStorage</code> automatically. Reload the page — they persist.
+            </p>
+
+            <!-- Source code -->
+            <div style="margin-top:2.5rem;">
+                <h2 style="font-size:1rem; font-weight:600; color:#111; margin:0 0 1rem; padding-bottom:0.4rem; border-bottom:1px solid #e8e8e8;">
+                    Source Code
+                </h2>
+                <p style="font-size:13px; color:#666; margin:0 0 1rem;">
+                    The full implementation — reactivity, computed, deep watcher, inline editing, and localStorage in one file.
+                </p>
+
+                <!-- Tab switcher -->
+                <div style="display:flex; gap:4px; margin-bottom:-1px; position:relative; z-index:1;">
+                    <button :class="srcTab === 'js' ? 'src-tab active' : 'src-tab'" @click="srcTab = 'js'" class="src-tab active">JavaScript</button>
+                    <button :class="srcTab === 'html' ? 'src-tab active' : 'src-tab'" @click="srcTab = 'html'" class="src-tab">Template</button>
+                </div>
+
+                <div>
+                    <code-block :lang="'js'" :code="srcJs" lang="js"></code-block>
+                </div>
+                <div style="display: none;">
+                    <code-block :lang="'html'" :code="srcHtml" lang="html"></code-block>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

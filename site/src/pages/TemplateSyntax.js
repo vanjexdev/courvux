@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         s_interp: `<!-- Text interpolation -->
@@ -160,5 +162,12 @@ export default {
                 <router-link to="/components" style="font-size:13px; color:#111; font-weight:600;">Components →</router-link>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Template Syntax',
+            description: 'Courvux directives and bindings: cv-if, cv-for, cv-model, cv-show, :class, :style, @event.',
+            slug: '/template',
+        });
+    },
 };

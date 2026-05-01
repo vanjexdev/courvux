@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-DaPEsSBI.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-C22xiKCb.css">
+    <title>Installation — Courvux</title>
+    <meta name="description" content="Install Courvux via npm, GitHub, or import map. Vite plugin for templateUrl inlining and CDN setup with jsDelivr.">
+    <meta property="og:title" content="Installation — Courvux">
+    <meta property="og:description" content="Install Courvux via npm, GitHub, or import map. Vite plugin for templateUrl inlining and CDN setup with jsDelivr.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/installation">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Installation — Courvux">
+    <meta name="twitter:description" content="Install Courvux via npm, GitHub, or import map. Vite plugin for templateUrl inlining and CDN setup with jsDelivr.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/installation">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>Installation</h1>
+            <p>Courvux ships as a single minified ES module with no runtime dependencies.</p>
+
+            <h2>CDN — jsDelivr</h2>
+            <p>No install, no build step. Drop a <code>&lt;script type="module"&gt;</code> anywhere:</p>
+            <code-block :lang="'html'" :code="sCdn" :label="'index.html'" lang="html"></code-block>
+            <p>Or use an import map to keep <code>import ... from 'courvux'</code> clean across multiple files:</p>
+            <code-block :lang="'html'" :code="sCdnMap" :label="'index.html'" lang="html"></code-block>
+            <div class="callout info">
+                Pin to a tag or commit hash in production — <code>@main</code> always resolves to the latest commit and may include breaking changes.
+            </div>
+            
+            <p style="margin-top:1.25rem; font-size:0.875rem; color:#333;">Try it live — no install required:</p>
+            <p style="margin:0 0 1rem; color:#888; font-size:12px;">Loading pen…</p>
+
+            <h2>From GitHub</h2>
+            <p>Install directly from the GitHub repository (no npm publish yet):</p>
+            <code-block :lang="'bash'" :code="s1" :label="'terminal'" lang="bash"></code-block>
+
+            <h2>Without a bundler — Import Map</h2>
+            <p>Add an import map before your module script. No build step needed.</p>
+            <code-block :lang="'html'" :code="s2" :label="'index.html'" lang="html"></code-block>
+
+            <h2>With Vite / bundler</h2>
+            <p>Import directly — Courvux resolves from <code>node_modules</code> automatically:</p>
+            <code-block :lang="'js'" :code="s3" :label="'main.js'" lang="js"></code-block>
+            <code-block :lang="'js'" :code="s4" :label="'vite.config.js'" lang="js"></code-block>
+
+            <h2>TypeScript</h2>
+            <p>Type declarations are included in the package at <code>dist/index.d.ts</code>.</p>
+            <code-block :lang="'json'" :code="s5" :label="'tsconfig.json'" lang="json"></code-block>
+
+            <h2>Updating</h2>
+            <div class="callout">
+                <code>dist/</code> is committed to the repo. Courvux does not run a build step on install.
+                To update, remove and re-add the package.
+            </div>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/" aria-current="page" class="active">← Home</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/quick-start" class="">Quick Start →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

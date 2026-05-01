@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         s_computed: `{
@@ -123,5 +125,12 @@ batchUpdate(() => {
                 <router-link to="/lifecycle" style="font-size:13px; color:#111; font-weight:600;">Lifecycle →</router-link>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Reactivity',
+            description: 'Proxy-based reactive state, computed properties, watchers, and refs in Courvux.',
+            slug: '/reactivity',
+        });
+    },
 };

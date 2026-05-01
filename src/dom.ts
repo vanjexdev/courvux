@@ -1116,13 +1116,20 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             Array.from(element.attributes).forEach(attr => {
                 if (attr.name !== 'to' && attr.name !== ':to') a.setAttribute(attr.name, attr.value);
             });
+            const routerBase = context.router?.base ?? '';
+            const stripBaseLocal = (p: string): string => {
+                if (!routerBase) return p || '/';
+                if (p === routerBase) return '/';
+                if (p.startsWith(routerBase + '/')) return p.slice(routerBase.length) || '/';
+                return p || '/';
+            };
             const getCurrentPath = () => context.router?.mode === 'history'
-                ? window.location.pathname
+                ? stripBaseLocal(window.location.pathname)
                 : window.location.hash.slice(1) || '/';
             const updateActive = () => {
                 const to = getTo();
                 const isActive = getCurrentPath() === to;
-                if (context.router?.mode === 'history') a.href = to;
+                if (context.router?.mode === 'history') a.href = `${routerBase}${to}`;
                 else a.href = `#${to}`;
                 if (isActive) { a.setAttribute('aria-current', 'page'); a.classList.add('active'); }
                 else { a.removeAttribute('aria-current'); a.classList.remove('active'); }

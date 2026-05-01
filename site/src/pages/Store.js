@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         s1: `import { createStore } from 'courvux';
@@ -110,5 +112,12 @@ createApp({
                 <router-link to="/advanced" style="font-size:13px; color:#111; font-weight:600;">Advanced →</router-link>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Store',
+            description: 'Global reactive state in Courvux with createStore, modules, and namespaced actions.',
+            slug: '/store',
+        });
+    },
 };

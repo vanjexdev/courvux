@@ -88,7 +88,7 @@ createApp({
                     <router-link to="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
                         <span style="font-size:1.3rem;">⚡</span>
                         <span style="font-weight:700; font-size:15px; color:#111;">Courvux</span>
-                        <span style="font-size:10px; color:#999; margin-left:2px;">v0.2.0</span>
+                        <span style="font-size:10px; color:#999; margin-left:2px;">v0.3.0</span>
                     </router-link>
                 </div>
 

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-DaPEsSBI.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-C22xiKCb.css">
+    <title>Advanced — Courvux</title>
+    <meta name="description" content="Custom directives, plugins, transitions, and the cv-data inline scope in Courvux.">
+    <meta property="og:title" content="Advanced — Courvux">
+    <meta property="og:description" content="Custom directives, plugins, transitions, and the cv-data inline scope in Courvux.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/advanced">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Advanced — Courvux">
+    <meta name="twitter:description" content="Custom directives, plugins, transitions, and the cv-data inline scope in Courvux.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/advanced">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>Advanced</h1>
+
+            <h2>Custom Directives</h2>
+            <p>Register globally via <code>app.directive()</code> or per-component via <code>directives</code>.</p>
+            <code-block :lang="'js'" :code="s_dir" lang="js"></code-block>
+            <code-block :lang="'html'" :code="s_dir_use" lang="html"></code-block>
+            <table>
+                <tbody><tr><th>Binding property</th><th>Description</th></tr>
+                <tr><td><code>value</code></td><td>Evaluated expression (reactive in <code>onUpdate</code>)</td></tr>
+                <tr><td><code>arg</code></td><td>Argument after <code>:</code> — <code>cv-pin:top</code> → <code>'top'</code></td></tr>
+                <tr><td><code>modifiers</code></td><td>Flags — <code>cv-pin.once</code> → <code>{ once: true }</code></td></tr>
+            </tbody></table>
+
+            <h2>Transitions — cv-transition</h2>
+            <p>Animate elements entering and leaving. Works on any element with <code>cv-show</code>.</p>
+            <code-block :lang="'html'" :code="s_transition" lang="html"></code-block>
+
+            <h2>cv-intersect — Intersection Observer</h2>
+            <code-block :lang="'html'" :code="s_intersect" lang="html"></code-block>
+
+            <h2>Plugin System</h2>
+            <p>A plugin is an object with an <code>install(app)</code> method. Install before mounting. Duplicate installs are silently ignored.</p>
+            <code-block :lang="'js'" :code="s_plugins" lang="js"></code-block>
+
+            <h2>app.magic() — global properties</h2>
+            <p>Register a <code>$name</code> property available in every component template.</p>
+            <code-block :lang="'js'" :code="s_magic" lang="js"></code-block>
+
+            <h2>autoInit()</h2>
+            <p>Initialize <code>cv-data</code> elements automatically — no <code>createApp()</code> required. Ideal for server-rendered HTML.</p>
+            <code-block :lang="'js'" :code="s_autoinit" lang="js"></code-block>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/store" class="">← Store</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/demo" class="">TODO Demo →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

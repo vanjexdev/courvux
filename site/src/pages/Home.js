@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         install: `# From GitHub
@@ -23,7 +25,7 @@ createApp({
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:1rem;">
                     <span style="font-size:2rem;">⚡</span>
                     <h1 style="font-size:2rem; font-weight:700; margin:0;">Courvux</h1>
-                    <span class="badge">v0.2.0</span>
+                    <span class="badge">v0.3.0</span>
                 </div>
                 <p style="font-size:1rem; color:#444; margin-bottom:1.5rem; max-width:560px; line-height:1.6;">
                     Lightweight reactive UI framework. No virtual DOM —
@@ -78,5 +80,11 @@ createApp({
                 </div>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            description: 'Lightweight reactive UI framework for the browser. No virtual DOM. Proxy-based reactivity. ~10 KB gzip.',
+            slug: '/',
+        });
+    },
 };

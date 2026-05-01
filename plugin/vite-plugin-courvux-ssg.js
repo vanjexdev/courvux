@@ -87,7 +87,10 @@ export default function courvuxSsg(options = {}) {
         async closeBundle() {
             if (skipDuringDev && isDevMode) return;
 
-            // Resolve shell template (string or path)
+            // Resolve shell template — priority:
+            //   1. explicit `template` option (HTML string or file path)
+            //   2. Vite-emitted <outDir>/index.html (preserves hashed asset paths)
+            //   3. fallback default minimal shell
             if (typeof templateOpt === 'string') {
                 if (templateOpt.includes('<')) {
                     resolvedTemplate = templateOpt;
@@ -97,6 +100,14 @@ export default function courvuxSsg(options = {}) {
                     } catch {
                         console.warn(`[courvux-ssg] Could not read template at ${templateOpt}, using default.`);
                     }
+                }
+            } else {
+                const viteIndexPath = path.join(resolvedOutDir, 'index.html');
+                try {
+                    const viteIndex = await fs.readFile(viteIndexPath, 'utf-8');
+                    resolvedTemplate = adaptViteIndex(viteIndex, mountId);
+                } catch {
+                    console.log(`[courvux-ssg] No Vite-emitted index.html found, using default minimal shell.`);
                 }
             }
 
@@ -237,4 +248,35 @@ async function emitRobots(outDir, baseUrl) {
     const trimmed = baseUrl.replace(/\/$/, '');
     const txt = `User-agent: *\nAllow: /\n\nSitemap: ${trimmed}/sitemap.xml\n`;
     await fs.writeFile(path.join(outDir, 'robots.txt'), txt, 'utf-8');
+}
+
+/**
+ * Adapt the Vite-emitted index.html to act as the SSG shell:
+ *  - replace the empty mount root <div id="<mountId>"></div> with `%app%` placeholder
+ *  - inject `%head%` placeholder right before </head>
+ * Asset references with content hashes (Vite's outputs) are preserved untouched.
+ */
+function adaptViteIndex(html, mountId) {
+    let out = html;
+
+    // Replace mount-root content with %app% (handles both empty and pre-rendered roots)
+    const mountRe = new RegExp(`(<div[^>]*\\bid="${mountId}"[^>]*>)([\\s\\S]*?)(</div>)`);
+    if (mountRe.test(out)) {
+        out = out.replace(mountRe, `$1%app%$3`);
+    } else {
+        console.warn(`[courvux-ssg] Could not find <div id="${mountId}"> in Vite index.html — appending mount root.`);
+        out = out.replace('</body>', `<div id="${mountId}">%app%</div>\n</body>`);
+    }
+
+    // Strip head tags that should be set per-page by useHead so we don't
+    // emit duplicates. Keep charset, viewport, and asset links untouched.
+    out = out.replace(/[ \t]*<title[^>]*>[\s\S]*?<\/title>\s*\n?/gi, '');
+    out = out.replace(/[ \t]*<meta\s+name=["'](description|twitter:[^"']*)["'][^>]*>\s*\n?/gi, '');
+    out = out.replace(/[ \t]*<meta\s+property=["']og:[^"']*["'][^>]*>\s*\n?/gi, '');
+    out = out.replace(/[ \t]*<link\s+rel=["']canonical["'][^>]*>\s*\n?/gi, '');
+
+    // Inject %head% before </head>. Subsequent per-page content goes here.
+    out = out.replace('</head>', '    %head%\n</head>');
+
+    return out;
 }

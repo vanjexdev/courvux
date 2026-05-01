@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-DaPEsSBI.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-C22xiKCb.css">
+    <title>Router — Courvux</title>
+    <meta name="description" content="SPA routing in Courvux: dynamic params, nested routes, navigation guards, transitions.">
+    <meta property="og:title" content="Router — Courvux">
+    <meta property="og:description" content="SPA routing in Courvux: dynamic params, nested routes, navigation guards, transitions.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/router">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Router — Courvux">
+    <meta name="twitter:description" content="SPA routing in Courvux: dynamic params, nested routes, navigation guards, transitions.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/router">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>Router</h1>
+            <p>Client-side routing with hash or history mode, transitions, guards, lazy loading, and nested routes.</p>
+
+            <h2>Setup</h2>
+            <code-block :lang="'js'" :code="s_setup" lang="js"></code-block>
+
+            <h2>Route options</h2>
+            <code-block :lang="'js'" :code="s_route" lang="js"></code-block>
+
+            <h2>Dynamic params &amp; $route</h2>
+            <code-block :lang="'js'" :code="s_params" lang="js"></code-block>
+            <table>
+                <tbody><tr><th>Property</th><th>Description</th></tr>
+                <tr><td><code>$route.path</code></td><td>Current pathname, e.g. <code>/user/42</code></td></tr>
+                <tr><td><code>$route.params</code></td><td>Path params — <code>{ id: '42' }</code></td></tr>
+                <tr><td><code>$route.query</code></td><td>Query string as object — <code>{ page: '2' }</code></td></tr>
+                <tr><td><code>$route.meta</code></td><td>Route-level metadata object</td></tr>
+            </tbody></table>
+
+            <h2>Lazy loading</h2>
+            <code-block :lang="'js'" :code="s_lazy" lang="js"></code-block>
+
+            <h2>Programmatic navigation — $router</h2>
+            <code-block :lang="'js'" :code="s_navigate" lang="js"></code-block>
+
+            <h2>Nested routes</h2>
+            <p>The parent component must contain a <code>&lt;router-view /&gt;</code>. Child paths are relative to the parent.</p>
+            <code-block :lang="'js'" :code="s_nested" lang="js"></code-block>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/lifecycle" class="">← Lifecycle</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/store" class="">Store →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

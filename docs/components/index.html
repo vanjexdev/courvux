@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-DaPEsSBI.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-C22xiKCb.css">
+    <title>Components — Courvux</title>
+    <meta name="description" content="Define, register, and compose Courvux components with props, slots, emits, and scoped slots.">
+    <meta property="og:title" content="Components — Courvux">
+    <meta property="og:description" content="Define, register, and compose Courvux components with props, slots, emits, and scoped slots.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/components">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Components — Courvux">
+    <meta name="twitter:description" content="Define, register, and compose Courvux components with props, slots, emits, and scoped slots.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/components">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>Components</h1>
+            <p>Components encapsulate template, data, methods, and lifecycle into reusable units.</p>
+
+            <h2>Defining &amp; registering</h2>
+            <p>Register in <code>components</code> on the root app or any parent component. Children are available in that component's template and all its descendants.</p>
+            <code-block :lang="'js'" :code="s_define" lang="js"></code-block>
+
+            <h2>Props</h2>
+            <p>Pass reactive data from parent to child via <code>:propName</code>. Parent changes flow down automatically.</p>
+            <code-block :lang="'js'" :code="s_props" lang="js"></code-block>
+
+            <h2>Emitting events — $emit</h2>
+            <p>Child notifies parent without direct coupling.</p>
+            <code-block :lang="'js'" :code="s_emit" lang="js"></code-block>
+
+            <h2>$dispatch — bubbling CustomEvent</h2>
+            <p>Alternative to emit — fires a native <code>CustomEvent</code> that bubbles up the DOM. Any ancestor element can catch it with <code>@event</code>.</p>
+            <code-block :lang="'js'" :code="s_dispatch" lang="js"></code-block>
+
+            <h2>Slots</h2>
+            <p>Default slot, named slots, and scoped slots (parent reads component-exposed data via <code>v-slot</code>).</p>
+            <code-block :lang="'html'" :code="s_slots" lang="html"></code-block>
+
+            <h2>Dynamic component</h2>
+            <p>Destroys and mounts a new component when the value changes.</p>
+            <code-block :lang="'html'" :code="s_dynamic" lang="html"></code-block>
+
+            <h2>$refs</h2>
+            <code-block :lang="'html'" :code="s_refs" lang="html"></code-block>
+
+            <h2>cv-model on components</h2>
+            <code-block :lang="'js'" :code="s_model" lang="js"></code-block>
+
+            <h2>Other instance properties</h2>
+            <table>
+                <tbody><tr><th>Property</th><th>Description</th></tr>
+                <tr><td><code>$el</code></td><td>Root DOM element</td></tr>
+                <tr><td><code>$attrs</code></td><td>Non-prop, non-event attributes. Set <code>inheritAttrs: false</code> to opt out of auto-inheritance.</td></tr>
+                <tr><td><code>$parent</code></td><td>Parent component's reactive state. Prefer props + emit when possible.</td></tr>
+                <tr><td><code>$slots</code></td><td>Object with <code>true</code> for each provided slot name. Use for conditional slot rendering.</td></tr>
+            </tbody></table>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/template" class="">← Template Syntax</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/reactivity" class="">Reactivity →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -59,17 +59,30 @@ interface ManagedTag {
 // SSR collection mode — populated by renderPage in src/ssr.ts during static
 // generation. When non-null, useHead() pushes its config here instead of
 // touching the document.
-let _collected: HeadConfig[] | null = null;
+//
+// Stored on globalThis so the framework's own modules and code that imports
+// `useHead` from a different module-cache slot (e.g. through a pnpm symlink)
+// see the same buffer. Without this, SSG-time `useHead` calls coming from
+// the user's bundle resolve to a separate module instance and are dropped.
+const HEAD_KEY = '__COURVUX_HEAD_COLLECTOR__';
+
+function getCollected(): HeadConfig[] | null {
+    return (globalThis as any)[HEAD_KEY] ?? null;
+}
+
+function setCollected(v: HeadConfig[] | null): void {
+    (globalThis as any)[HEAD_KEY] = v;
+}
 
 /** @internal — used by `renderPage` in src/ssr.ts to capture head calls during SSG. */
 export function _startHeadCollection(): void {
-    _collected = [];
+    setCollected([]);
 }
 
 /** @internal — called by `renderPage` to retrieve and reset the collected head. */
 export function _stopHeadCollection(): HeadConfig[] {
-    const result = _collected ?? [];
-    _collected = null;
+    const result = getCollected() ?? [];
+    setCollected(null);
     return result;
 }
 
@@ -112,8 +125,9 @@ const upsertTag = (
 
 export function useHead(config: HeadConfig): () => void {
     // SSG / SSR collection mode — capture without touching the document.
-    if (_collected !== null) {
-        _collected.push(config);
+    const collected = getCollected();
+    if (collected !== null) {
+        collected.push(config);
         return () => {};
     }
     if (typeof document === 'undefined') return () => {};

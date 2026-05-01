@@ -1151,11 +1151,18 @@ async function walk(el, state, context) {
       Array.from(element.attributes).forEach((attr) => {
         if (attr.name !== "to" && attr.name !== ":to") a.setAttribute(attr.name, attr.value);
       });
-      const getCurrentPath = () => context.router?.mode === "history" ? window.location.pathname : window.location.hash.slice(1) || "/";
+      const routerBase = context.router?.base ?? "";
+      const stripBaseLocal = (p) => {
+        if (!routerBase) return p || "/";
+        if (p === routerBase) return "/";
+        if (p.startsWith(routerBase + "/")) return p.slice(routerBase.length) || "/";
+        return p || "/";
+      };
+      const getCurrentPath = () => context.router?.mode === "history" ? stripBaseLocal(window.location.pathname) : window.location.hash.slice(1) || "/";
       const updateActive = () => {
         const to = getTo();
         const isActive = getCurrentPath() === to;
-        if (context.router?.mode === "history") a.href = to;
+        if (context.router?.mode === "history") a.href = `${routerBase}${to}`;
         else a.href = `#${to}`;
         if (isActive) {
           a.setAttribute("aria-current", "page");
@@ -1481,6 +1488,12 @@ var runComponentLeaveGuard = (activation, to) => {
   if (!activation?.beforeLeave) return Promise.resolve(void 0);
   return new Promise((resolve2) => activation.beforeLeave(to, resolve2));
 };
+function stripBase(pathname, base) {
+  if (!base) return pathname || "/";
+  if (pathname === base) return "/";
+  if (pathname.startsWith(base + "/")) return pathname.slice(base.length) || "/";
+  return pathname || "/";
+}
 function parseQuery(search) {
   if (!search) return {};
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -1491,8 +1504,9 @@ function parseQuery(search) {
   return out;
 }
 function setupRouterView(el, router, mount3, name = "default", onFirstRender) {
+  const base = router.base ?? "";
   const getCurrentPath = () => {
-    if (router.mode === "history") return window.location.pathname;
+    if (router.mode === "history") return stripBase(window.location.pathname, base);
     const hash = window.location.hash.slice(1) || "/";
     return hash.split("?")[0] || "/";
   };
@@ -1603,6 +1617,7 @@ function setupRouterView(el, router, mount3, name = "default", onFirstRender) {
                   const childRouter = {
                     routes: route.children,
                     mode: router.mode,
+                    base: router.base,
                     transition: route.transition ?? router.transition,
                     beforeEach: router.beforeEach,
                     afterEach: router.afterEach,
