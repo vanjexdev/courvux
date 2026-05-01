@@ -5,6 +5,16 @@ Format: `[version] — date — description`
 
 ---
 
+## [Unreleased]
+
+### Features
+
+#### `useHead` composable for per-component head management
+**File:** `src/head.ts`
+Per-route SEO metadata: `title`, `titleTemplate`, `meta`, `link`, `script`, `htmlAttrs`, `bodyAttrs`. Returns a cleanup function that reverts every tag it touched (existing tags' previous attrs are captured and restored). Dedupe rules: meta by `name`/`property`/`http-equiv`; link by `rel="canonical"` or `rel+href`. SSR-safe (no-op when `document` is unavailable). See README "SEO and `useHead`".
+
+---
+
 ## [0.3.0] — 2026-04-29
 
 ### Bug fixes

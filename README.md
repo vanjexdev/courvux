@@ -103,6 +103,7 @@
 - [Plugin System](#plugin-system)
   - [Defining plugins with `createPlugin`](#defining-plugins-with-createplugin)
 - [Composables](#composables)
+- [SEO and `useHead`](#seo-and-usehead)
 - [Event Bus](#event-bus)
 - [Reactivity escape hatches](#reactivity-escape-hatches)
 - [DevTools](#devtools)
@@ -2039,6 +2040,74 @@ onMount() {
 
 ---
 
+## SEO and `useHead`
+
+`useHead` is the per-component head management composable. It updates `document.title`, inserts/upserts `<meta>` and `<link>` tags, and lets each route declare its own metadata. Tags are reverted on cleanup so navigating away from a route restores the previous head exactly.
+
+```js
+import { useHead } from 'courvux';
+
+export default {
+    onMount() {
+        const cleanup = useHead({
+            title: 'Installation',
+            titleTemplate: '%s — Courvux',
+            meta: [
+                { name: 'description', content: 'Get started with Courvux in under 60 seconds.' },
+                { property: 'og:title',       content: 'Installation — Courvux' },
+                { property: 'og:description', content: 'Get started with Courvux in under 60 seconds.' },
+                { property: 'og:image',       content: '/og/installation.png' },
+                { name: 'twitter:card',       content: 'summary_large_image' },
+            ],
+            link: [
+                { rel: 'canonical', href: 'https://courvux.dev/installation' },
+            ],
+        });
+        this.$addCleanup(cleanup);
+    }
+};
+```
+
+### Config shape
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | `string` | Replaces `document.title`. Restored on cleanup. |
+| `titleTemplate` | `string \| (t) => string` | String form: `%s` is replaced. Function form: receives the title and returns the final string. |
+| `meta` | `HeadMeta[]` | Each entry becomes a `<meta>` tag. Dedupe by `name`, then `property`, then `http-equiv`. |
+| `link` | `HeadLink[]` | Each entry becomes a `<link>` tag. `rel="canonical"` is unique. Other links dedupe by `rel + href`. |
+| `script` | `HeadScript[]` | Each entry becomes a `<script>` tag. Use `innerHTML` for inline content. Always inserted fresh — use sparingly. |
+| `htmlAttrs` | `Record<string,string>` | Sets attributes on `<html>` (e.g. `lang`, `class`). Restored on cleanup. |
+| `bodyAttrs` | `Record<string,string>` | Sets attributes on `<body>`. Restored on cleanup. |
+
+### JSON-LD structured data
+
+Inject Schema.org structured data via the `script` field:
+
+```js
+useHead({
+    script: [{
+        type: 'application/ld+json',
+        innerHTML: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareApplication',
+            name: 'Courvux',
+            applicationCategory: 'DeveloperApplication',
+            operatingSystem: 'Any',
+            offers: { '@type': 'Offer', price: '0' },
+        }),
+    }],
+});
+```
+
+### SSR safety
+
+`useHead` is a no-op when `document` is unavailable, so it's safe to call during SSR. SSG integration that captures these tags during `renderToString` for static HTML emission is on the roadmap.
+
+> **Tip — SEO baseline.** Pair `useHead` with `mode: 'history'` in the router so each route has a real URL the crawler can fetch. Hash routing (`#/path`) prevents servers and crawlers from seeing per-route content.
+
+---
+
 ## Event Bus
 
 For cross-component signals that don't belong in the store (analytics events, IPC bridges, plugin hooks), Courvux exports a typed event bus:
@@ -2451,6 +2520,9 @@ Everything exported from `'courvux'` (v0.3.0):
 **SSR:**
 `renderToString`, `SSR_ATTR`
 
+**SEO:**
+`useHead`
+
 **Subpath exports:**
 
 | Path | Purpose |
@@ -2460,4 +2532,4 @@ Everything exported from `'courvux'` (v0.3.0):
 | `'courvux/plugin'` | Vite plugin for `templateUrl` inlining |
 
 **Type exports** (`import type`):
-`AppConfig`, `ComponentConfig`, `RouteConfig`, `Router`, `RouteMatch`, `RouteActivation`, `NavigationGuard`, `ScrollBehavior`, `WatcherEntry`, `WatcherOptions`, `DirectiveBinding`, `DirectiveDef`, `DirectiveShorthand`, `LazyComponent`, `ComputedDef`, `EventBus`, `FetchState`, `FetchOptions`, `DevToolsHook`, `DevToolsComponentInstance`, `DevToolsStoreEntry`, `StoreConfig`
+`AppConfig`, `ComponentConfig`, `RouteConfig`, `Router`, `RouteMatch`, `RouteActivation`, `NavigationGuard`, `ScrollBehavior`, `WatcherEntry`, `WatcherOptions`, `DirectiveBinding`, `DirectiveDef`, `DirectiveShorthand`, `LazyComponent`, `ComputedDef`, `EventBus`, `FetchState`, `FetchOptions`, `DevToolsHook`, `DevToolsComponentInstance`, `DevToolsStoreEntry`, `StoreConfig`, `HeadConfig`, `HeadMeta`, `HeadLink`, `HeadScript`
