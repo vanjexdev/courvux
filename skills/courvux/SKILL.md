@@ -10,16 +10,18 @@ description: >
 
 Lightweight reactive UI framework for the browser. No virtual DOM. ~20.7 KB gzip with everything (router, store, devtools, composables, useHead, SSR primitives). Vue/Alpine ergonomics.
 
+All paths below are relative to the repo root (`vanjexdev/courvux`).
+
 | | |
 |---|---|
-| Source | `/home/jesusuzcategui/WorkspaceNode/cv-framework/` |
-| Dist | `/home/jesusuzcategui/WorkspaceNode/cv-framework/dist/index.js` |
-| Docs site source | `/home/jesusuzcategui/WorkspaceNode/cv-framework/site/` |
-| Docs site output | `/home/jesusuzcategui/WorkspaceNode/cv-framework/docs/` (GH Pages) |
-| Examples | `/home/jesusuzcategui/WorkspaceNode/cv-framework/examples/` |
-| Changelog | `/home/jesusuzcategui/WorkspaceNode/cv-framework/CHANGELOG.md` |
-| Benchmarks | `/home/jesusuzcategui/WorkspaceNode/cv-framework/BENCHMARKS.md` |
-| Current version | **0.4.0** |
+| Source | `src/` |
+| Dist | `dist/index.js` |
+| Docs site source | `site/` |
+| Docs site output | `docs/` (GH Pages) |
+| Examples | `examples/` |
+| Changelog | `CHANGELOG.md` |
+| Benchmarks | `BENCHMARKS.md` |
+| Current version | **0.4.2** |
 | Repo | `https://github.com/vanjexdev/courvux` |
 | Live docs | `https://vanjexdev.github.io/courvux/` |
 
@@ -340,6 +342,15 @@ export default defineConfig({
             // Optional — emits dist/404.html for static-host fallback
             notFound: async () => (await import('./src/pages/NotFound.js')).default,
 
+            // Optional — same global components passed to createApp().
+            // Required for custom components (<code-block>, <my-card>, etc.)
+            // to render into static HTML during SSG instead of staying as
+            // unprocessed tags. Default-slot content is rendered; named/
+            // scoped slots are skipped at build time and hydrate on client.
+            components: async () => ({
+                'code-block': (await import('./src/components/CodeBlock.js')).CodeBlock,
+            }),
+
             // Optional — custom shell. Default: auto-reads Vite-emitted index.html
             // template: '<!doctype html>...%head%...%app%...',
             // mountId: 'app',
@@ -506,7 +517,7 @@ Only **top-level** `[cv-data]` elements are walked — nested ones are handled b
 
 ---
 
-## Top-level exports (v0.4.0)
+## Top-level exports (v0.4.2)
 
 **App**: `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
 **Router/Store**: `createRouter`, `createStore`

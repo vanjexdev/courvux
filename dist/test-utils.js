@@ -1881,22 +1881,27 @@ function mountDevOverlay(hook) {
     });
   });
   const head = panel.querySelector("#cvd-head");
-  let dragging = false, ox = 0, oy = 0;
-  head.addEventListener("mousedown", (e) => {
+  head.addEventListener("pointerdown", (e) => {
     if (e.target.closest("button")) return;
-    dragging = true;
-    ox = e.clientX - root.getBoundingClientRect().left;
-    oy = e.clientY - root.getBoundingClientRect().top;
-  });
-  document.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
-    root.style.right = "auto";
-    root.style.bottom = "auto";
-    root.style.left = `${e.clientX - ox}px`;
-    root.style.top = `${e.clientY - oy}px`;
-  });
-  document.addEventListener("mouseup", () => {
-    dragging = false;
+    head.setPointerCapture(e.pointerId);
+    const startX = e.clientX, startY = e.clientY;
+    const startLeft = root.offsetLeft;
+    const startTop = root.offsetTop;
+    const move = (ev) => {
+      root.style.right = "auto";
+      root.style.bottom = "auto";
+      root.style.left = `${startLeft + (ev.clientX - startX)}px`;
+      root.style.top = `${startTop + (ev.clientY - startY)}px`;
+    };
+    const up = (ev) => {
+      head.releasePointerCapture(ev.pointerId);
+      head.removeEventListener("pointermove", move);
+      head.removeEventListener("pointerup", up);
+      head.removeEventListener("pointercancel", up);
+    };
+    head.addEventListener("pointermove", move);
+    head.addEventListener("pointerup", up);
+    head.addEventListener("pointercancel", up);
   });
   function renderComponents() {
     const instances = hook.instances;

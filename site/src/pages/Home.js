@@ -3,7 +3,7 @@ import { setHead } from '../seo.js';
 export default {
     data: {
         install: `# From GitHub — pin a tag for stable installs
-pnpm add github:vanjexdev/courvux#v0.4.1
+pnpm add github:vanjexdev/courvux#v0.4.2
 
 # or rolling main
 pnpm add github:vanjexdev/courvux`,
@@ -25,7 +25,7 @@ createApp({
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:1rem;">
                     <span style="font-size:2rem;">⚡</span>
                     <h1 style="font-size:2rem; font-weight:700; margin:0;">Courvux</h1>
-                    <span class="badge">v0.4.1</span>
+                    <span class="badge">v0.4.2</span>
                 </div>
                 <p style="font-size:1rem; color:#444; margin-bottom:1.5rem; max-width:560px; line-height:1.6;">
                     Lightweight reactive UI framework. No virtual DOM —
@@ -46,8 +46,8 @@ createApp({
             <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-bottom:2.5rem;">
                 <div style="padding:16px; border:1px solid #e8e8e8; border-radius:8px; background:#fff;">
                     <div style="font-size:1.2rem; margin-bottom:8px;">🚀</div>
-                    <div style="font-size:13px; font-weight:600; margin-bottom:4px;">~10 kB gzip</div>
-                    <div style="font-size:12px; color:#666;">Single ES module. Zero runtime dependencies.</div>
+                    <div style="font-size:13px; font-weight:600; margin-bottom:4px;">~20 kB gzip</div>
+                    <div style="font-size:12px; color:#666;">Single ES module with router, store, devtools, composables, useHead, SSR.</div>
                 </div>
                 <div style="padding:16px; border:1px solid #e8e8e8; border-radius:8px; background:#fff;">
                     <div style="font-size:1.2rem; margin-bottom:8px;">⚡</div>
@@ -83,7 +83,7 @@ createApp({
     `,
     onMount() {
         setHead({
-            description: 'Lightweight reactive UI framework for the browser. No virtual DOM. Proxy-based reactivity. ~10 KB gzip.',
+            description: 'Lightweight reactive UI framework for the browser. No virtual DOM. Proxy-based reactivity. ~20 KB gzip with everything (router, store, devtools, composables, useHead, SSR).',
             slug: '/',
         });
     },

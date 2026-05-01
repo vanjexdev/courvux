@@ -5,6 +5,40 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.2] — 2026-05-01
+
+### Features
+
+#### SSG renders custom components into static HTML
+**Files:** `src/ssr.ts`, `plugin/vite-plugin-courvux-ssg.js`
+Before: `renderPage` walked templates without registering any components, so custom-component tags (`<code-block :code="install">`, `<my-card :title="x">`, etc.) were left intact in the emitted HTML — crawlers and `View Source` saw empty `<code-block>` tags with bound expressions still un-evaluated.
+**Fix:**
+- `renderPage(opts.components)` — accepts a global components map.
+- New internal `ssgMountElement` resolves `:prop="expr"` against parent state (with `toRaw`), builds child state, runs `onBeforeMount` and `onMount` (so `useHead` capture and ref-using setup like Prism syntax highlighting fire), walks the child template recursively, and replaces the original element with the rendered output.
+- SSG plugin gains a `components: object | () => Promise<object>` option mirroring `routes:` / `notFound:`. Same map registered on `createApp({ components })` is now used at build time.
+- Default-slot content is captured and rendered. Named/scoped slots are not yet handled in SSG — they hydrate on the client.
+**Result:** Bound props are evaluated and visible in `view-source`; full HTML for SEO/OG previews. The docs site now ships static HTML where every code-block is fully Prism-highlighted at build time.
+**Known limitation:** Prism's HTML markup grammar has an artifact under happy-dom that duplicates the open-tag of `<!-- ... -->` comments inside a `language-html` block. Cosmetic only — surrounding code highlights correctly, and the underlying source code text in the DOM is intact. Other languages (bash, js, ts, json) are unaffected.
+
+### Documentation
+
+#### Skill paths converted to repo-relative
+**File:** `skills/courvux/SKILL.md`
+The bundled Claude Code skill referenced absolute paths under `/home/jesusuzcategui/...` for source, dist, site, examples, etc. After cloning the repo and copying the skill into `~/.claude/skills/courvux/`, those paths don't exist on the user's machine. Replaced with repo-relative paths (`src/`, `dist/index.js`, `site/`, etc.) plus a header noting the convention.
+
+#### README size claim corrected (~10 KB → ~20 KB)
+**File:** `README.md`
+Header tagline, gzip badge, comparison table, and Building section all stated `~10 KB gzip`. The actual measured bundle is 20.7 KB gzip with everything (router, store, devtools, composables, useHead, SSR primitives) — the 10 KB figure dated from a much earlier core-only state. Updated to `~20 KB`, with the comparison-table cell labeled "(full)" so it's compared apples-to-apples against Alpine/Petite-Vue/Preact (~5–15 KB) which themselves include their respective runtimes.
+
+### Performance fixes
+
+#### DevTools overlay drag forced reflow (~64ms)
+**File:** `src/overlay.ts`
+Lighthouse `forced-reflow-insight` flagged two `getBoundingClientRect()` calls inside the panel-drag `mousedown` handler. Each call forces the browser to flush pending style/layout before returning dimensions; doing two back-to-back compounds the cost (~64ms in the audit).
+**Fix:** Switch to `pointerdown` / `pointermove` with `setPointerCapture`. Capture the cursor and the panel's position once (`offsetLeft`/`offsetTop`) at drag start; subsequent `pointermove` writes only set `style.left/top` from cached values + cursor delta — no layout reads during drag. Listeners are scoped to the head element via pointer capture so they auto-clean on release/cancel.
+
+---
+
 ## [0.4.1] — 2026-05-01
 
 ### Documentation
