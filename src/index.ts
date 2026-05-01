@@ -16,7 +16,8 @@ export { cvStorage, cvListener, cvMediaQuery, cvFetch, cvDebounce, cvThrottle } 
 export type { FetchState, FetchOptions } from './composables.js';
 export { setupDevTools } from './devtools.js';
 export { mountDevOverlay } from './overlay.js';
-export { renderToString, SSR_ATTR } from './ssr.js';
+export { renderToString, renderPage, renderHeadToString, SSR_ATTR } from './ssr.js';
+export type { RenderedPage } from './ssr.js';
 export { useHead } from './head.js';
 export type { HeadConfig, HeadMeta, HeadLink, HeadScript } from './head.js';
 export type { DevToolsHook, DevToolsComponentInstance, DevToolsStoreEntry } from './devtools.js';

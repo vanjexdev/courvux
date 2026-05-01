@@ -56,6 +56,23 @@ interface ManagedTag {
     created: boolean;
 }
 
+// SSR collection mode — populated by renderPage in src/ssr.ts during static
+// generation. When non-null, useHead() pushes its config here instead of
+// touching the document.
+let _collected: HeadConfig[] | null = null;
+
+/** @internal — used by `renderPage` in src/ssr.ts to capture head calls during SSG. */
+export function _startHeadCollection(): void {
+    _collected = [];
+}
+
+/** @internal — called by `renderPage` to retrieve and reset the collected head. */
+export function _stopHeadCollection(): HeadConfig[] {
+    const result = _collected ?? [];
+    _collected = null;
+    return result;
+}
+
 const setAttrs = (el: Element, attrs: Record<string, any>): void => {
     Object.entries(attrs).forEach(([k, v]) => {
         if (k === 'innerHTML') return;
@@ -94,6 +111,11 @@ const upsertTag = (
 };
 
 export function useHead(config: HeadConfig): () => void {
+    // SSG / SSR collection mode — capture without touching the document.
+    if (_collected !== null) {
+        _collected.push(config);
+        return () => {};
+    }
     if (typeof document === 'undefined') return () => {};
 
     const managed: ManagedTag[] = [];

@@ -7,7 +7,8 @@
     "exports": {
         ".": "./dist/index.js",
         "./test-utils": "./dist/test-utils.js",
-        "./plugin": "./plugin/vite-plugin-courvux.js"
+        "./plugin": "./plugin/vite-plugin-courvux.js",
+        "./plugin/ssg": "./plugin/vite-plugin-courvux-ssg.js"
     },
     "types": "dist/index.d.ts",
     "files": [
@@ -20,6 +21,8 @@
         "dev": "concurrently \"npm run dev:ts\" \"npm run dev:server\"",
         "build": "vite build && esbuild src/test-utils.ts --bundle --format=esm --outfile=dist/test-utils.js && esbuild dist/index.js --bundle=false --minify --allow-overwrite --outfile=dist/index.js && tsc -p tsconfig.types.json",
         "test:ssr": "node ssr-test.mjs",
+        "test:ssg": "node ssg-test.mjs",
+        "test:all": "vitest run && node ssr-test.mjs && node ssg-test.mjs",
         "test": "vitest run",
         "test:watch": "vitest"
     },
