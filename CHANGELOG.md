@@ -5,6 +5,38 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.4] — 2026-05-01
+
+### Bug fixes
+
+#### `<router-link>` crashes mount on Safari and Samsung Internet
+**File:** `src/dom.ts` — `router-link` directive
+Reported on iOS Safari and Samsung Internet (mobile): page renders blank with the unhandled rejection
+`Failed to execute 'setAttribute' on 'Element': '@click' is not a valid attribute name.`
+Cause: when the framework cloned `<router-link>` into the inner `<a>`, it forwarded **every** original attribute via `setAttribute(attr.name, attr.value)`. The HTML parser accepts framework directive names containing `@` and `:` (`@click`, `:aria-label`, etc.), but the `setAttribute()` DOM API in stricter browsers rejects them outright. Desktop Chrome / Firefox accepted these silently, so the bug went undetected.
+**Fix:**
+1. Build the inner `<a>` via `innerHTML` so the HTML parser handles framework attribute names (the parser-path is lenient).
+2. Wrap the new anchor in a `DocumentFragment` before walking so directives **on** the anchor itself (`@click`, `:aria-label`, `:aria-expanded`, `cv-show`, etc.) are processed by the directive handlers — `walk()` only visits children of the passed node.
+
+Affects every `<router-link>` that carries any framework directive — including the docs site sidebar where `@click="closeSidebar()"` was on every link.
+
+Also added in the docs site (`site/src/main.js`):
+- `<router-view />` → `<router-view></router-view>` (we documented self-closing custom elements as a no-go and were violating it ourselves).
+- `.mount('#app').catch(...)` — surfaces mount failures as an inline error card instead of a blank page, so the next mobile-only crash is diagnosable without remote debugging.
+
+---
+
+## [0.4.3] — 2026-05-01
+
+### Bug fixes
+
+#### iOS Safari `InvalidCharacterError` during hydration of SSG'd custom components
+**File:** `src/ssr.ts` — `ssgMountElement`
+The 0.4.2 SSG-components feature rendered child-component templates into static HTML but did not strip the framework attributes the walk had already processed. Bindings like `:class="'language-' + lang"` and `cv-html`/`cv-ref` survived into the emitted HTML, which then meant client-side hydration re-walked them in the **wrong scope** (the page's parent state, where the inner component's local data — `lang`, `code`, etc. — does not exist). On iOS Safari this surfaced as an unhandled `InvalidCharacterError: The string contains invalid characters.` during initial mount; the page failed to render.
+**Fix:** After walking the rendered template in `ssgMountElement`, traverse the subtree and remove every `:`-prefixed attribute and `cv-html` from the rendered output. Their resolved values are already baked into the static `class`/`style`/etc. attributes, so removal is lossless. `@event` listeners (e.g. the Copy button on `<code-block>`) are preserved so the client can still wire interactivity.
+
+---
+
 ## [0.4.2] — 2026-05-01
 
 ### Features

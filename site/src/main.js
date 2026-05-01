@@ -167,10 +167,10 @@ createApp({
             ">
                 <!-- Logo -->
                 <div style="padding: 20px 16px 12px; border-bottom: 1px solid #f0f0f0;">
-                    <router-link to="/" @click="closeSidebar()" style="text-decoration:none; display:flex; align-items:center; gap:8px;" aria-label="Courvux v0.4.2 home">
+                    <router-link to="/" @click="closeSidebar()" style="text-decoration:none; display:flex; align-items:center; gap:8px;" aria-label="Courvux v0.4.4 home">
                         <span style="font-size:1.3rem;" aria-hidden="true">⚡</span>
                         <span style="font-weight:700; font-size:15px; color:#111;">Courvux</span>
-                        <span style="font-size:10px; color:#666; margin-left:2px;">v0.4.2</span>
+                        <span style="font-size:10px; color:#666; margin-left:2px;">v0.4.4</span>
                     </router-link>
                 </div>
 
@@ -276,9 +276,24 @@ createApp({
             <!-- ── Content ───────────────────────────────────────── -->
             <main id="main-content" role="main" style="flex:1; overflow-y:auto; min-height:100vh;">
                 <div style="max-width:780px; margin:0 auto; padding:2.5rem 2rem 4rem;">
-                    <router-view />
+                    <router-view></router-view>
                 </div>
             </main>
         </div>
     `,
-}).mount("#app");
+}).mount("#app").catch(err => {
+    // Make mount failures visible (mobile browsers sometimes swallow these
+    // into unhandled promise rejections, leaving a blank page that's
+    // impossible to diagnose without remote debugging).
+    console.error("[courvux] mount failed:", err);
+    const root = document.getElementById("app");
+    if (root) {
+        root.innerHTML = `
+            <div style="padding:1.5rem; max-width:680px; margin:2rem auto; font-family:ui-monospace,monospace; font-size:13px; color:#111; background:#fff; border:1px solid #ddd; border-radius:8px;">
+                <p style="font-weight:600; margin:0 0 8px;">App failed to mount</p>
+                <pre style="white-space:pre-wrap; word-break:break-word; margin:0; color:#a33;">${(err && err.message ? err.message : String(err)).replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</pre>
+                <p style="margin:12px 0 0; color:#666; font-size:12px;">Check the browser console for the full stack trace.</p>
+            </div>
+        `;
+    }
+});

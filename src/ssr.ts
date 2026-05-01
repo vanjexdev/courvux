@@ -136,6 +136,32 @@ async function ssgMountElement(
     await walk(wrapper as any, childState, ssgCtx as any);
     try { await componentConfig.onMount?.call(childState); } catch { /* */ }
 
+    // Strip framework attributes the walk processed but didn't remove from
+    // the DOM (`:prop` bindings, `cv-html`, etc.). Their resolved values are
+    // already baked into the static `class`/`style`/etc. attributes, so
+    // leaving the source bindings would (a) ship dead bytes and (b) make
+    // client-side hydration re-evaluate them in the wrong scope (e.g. the
+    // page's parent state, where the inner-component's `lang` is undefined).
+    // It also avoids iOS Safari `InvalidCharacterError`s seen in practice
+    // when colon-prefixed attribute names survive into the hydrated DOM.
+    // `@event` listeners are preserved — the client still needs to wire them
+    // for interactive controls (like a Copy button).
+    const stripFrameworkAttrs = (root: Element) => {
+        const all = root.querySelectorAll('*');
+        const els: Element[] = [root, ...Array.from(all)];
+        for (const node of els) {
+            for (const attr of Array.from(node.attributes)) {
+                if (
+                    attr.name.startsWith(':') ||
+                    attr.name.startsWith('cv-html')
+                ) {
+                    node.removeAttribute(attr.name);
+                }
+            }
+        }
+    };
+    Array.from(wrapper.children).forEach(child => stripFrameworkAttrs(child));
+
     // Replace original element with rendered output (preserve as a fragment).
     const out = document.createDocumentFragment();
     while (wrapper.firstChild) out.appendChild(wrapper.firstChild);
