@@ -9,6 +9,8 @@ export type { FetchState, FetchOptions } from './composables.js';
 export { setupDevTools } from './devtools.js';
 export { mountDevOverlay } from './overlay.js';
 export { renderToString, SSR_ATTR } from './ssr.js';
+export { useHead } from './head.js';
+export type { HeadConfig, HeadMeta, HeadLink, HeadScript } from './head.js';
 export type { DevToolsHook, DevToolsComponentInstance, DevToolsStoreEntry } from './devtools.js';
 export type { AppConfig, ComponentConfig, RouteConfig, Router, RouteMatch, NavigationGuard, ScrollBehavior, WatcherEntry, WatcherOptions, DirectiveBinding, DirectiveDef, DirectiveShorthand, LazyComponent, ComputedDef } from './types.js';
 export type { RouteActivation } from './router.js';

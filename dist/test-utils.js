@@ -1755,7 +1755,7 @@ function nextDevToolsId() {
 }
 
 // src/overlay.ts
-var CSS = `
+var CSS2 = `
 #cvd{position:fixed;bottom:16px;right:16px;z-index:2147483647;font-family:monospace;font-size:12px;line-height:1.4}
 #cvd *{box-sizing:border-box;margin:0;padding:0}
 #cvd-badge{background:#5b4cf5;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.5px;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
@@ -1798,7 +1798,7 @@ function injectCss() {
   if (document.getElementById("cvd-styles")) return;
   const s = document.createElement("style");
   s.id = "cvd-styles";
-  s.textContent = CSS;
+  s.textContent = CSS2;
   document.head.appendChild(s);
 }
 function formatVal(v) {
