@@ -5,6 +5,17 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.3] — 2026-05-01
+
+### Bug fixes
+
+#### iOS Safari `InvalidCharacterError` during hydration of SSG'd custom components
+**File:** `src/ssr.ts` — `ssgMountElement`
+The 0.4.2 SSG-components feature rendered child-component templates into static HTML but did not strip the framework attributes the walk had already processed. Bindings like `:class="'language-' + lang"` and `cv-html`/`cv-ref` survived into the emitted HTML, which then meant client-side hydration re-walked them in the **wrong scope** (the page's parent state, where the inner component's local data — `lang`, `code`, etc. — does not exist). On iOS Safari this surfaced as an unhandled `InvalidCharacterError: The string contains invalid characters.` during initial mount; the page failed to render.
+**Fix:** After walking the rendered template in `ssgMountElement`, traverse the subtree and remove every `:`-prefixed attribute and `cv-html` from the rendered output. Their resolved values are already baked into the static `class`/`style`/etc. attributes, so removal is lossless. `@event` listeners (e.g. the Copy button on `<code-block>`) are preserved so the client can still wire interactivity.
+
+---
+
 ## [0.4.2] — 2026-05-01
 
 ### Features

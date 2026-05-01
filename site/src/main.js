@@ -167,10 +167,10 @@ createApp({
             ">
                 <!-- Logo -->
                 <div style="padding: 20px 16px 12px; border-bottom: 1px solid #f0f0f0;">
-                    <router-link to="/" @click="closeSidebar()" style="text-decoration:none; display:flex; align-items:center; gap:8px;" aria-label="Courvux v0.4.2 home">
+                    <router-link to="/" @click="closeSidebar()" style="text-decoration:none; display:flex; align-items:center; gap:8px;" aria-label="Courvux v0.4.3 home">
                         <span style="font-size:1.3rem;" aria-hidden="true">⚡</span>
                         <span style="font-weight:700; font-size:15px; color:#111;">Courvux</span>
-                        <span style="font-size:10px; color:#666; margin-left:2px;">v0.4.2</span>
+                        <span style="font-size:10px; color:#666; margin-left:2px;">v0.4.3</span>
                     </router-link>
                 </div>
 
