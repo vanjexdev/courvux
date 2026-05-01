@@ -46,8 +46,8 @@ createApp({
             <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; margin-bottom:2.5rem;">
                 <div style="padding:16px; border:1px solid #e8e8e8; border-radius:8px; background:#fff;">
                     <div style="font-size:1.2rem; margin-bottom:8px;">🚀</div>
-                    <div style="font-size:13px; font-weight:600; margin-bottom:4px;">~10 kB gzip</div>
-                    <div style="font-size:12px; color:#666;">Single ES module. Zero runtime dependencies.</div>
+                    <div style="font-size:13px; font-weight:600; margin-bottom:4px;">~20 kB gzip</div>
+                    <div style="font-size:12px; color:#666;">Single ES module with router, store, devtools, composables, useHead, SSR.</div>
                 </div>
                 <div style="padding:16px; border:1px solid #e8e8e8; border-radius:8px; background:#fff;">
                     <div style="font-size:1.2rem; margin-bottom:8px;">⚡</div>
@@ -83,7 +83,7 @@ createApp({
     `,
     onMount() {
         setHead({
-            description: 'Lightweight reactive UI framework for the browser. No virtual DOM. Proxy-based reactivity. ~10 KB gzip.',
+            description: 'Lightweight reactive UI framework for the browser. No virtual DOM. Proxy-based reactivity. ~20 KB gzip with everything (router, store, devtools, composables, useHead, SSR).',
             slug: '/',
         });
     },
