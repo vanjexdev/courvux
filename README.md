@@ -3,12 +3,12 @@
   <br>
   <em>Lightweight reactive UI framework for the browser.</em>
   <br>
-  No virtual DOM. ~10 KB gzip. Vue/Alpine ergonomics. Built-in router, store, and DevTools.
+  No virtual DOM. ~20 KB gzip with router, store, devtools, composables, useHead, and SSR primitives. Vue/Alpine ergonomics.
 </p>
 
 <p align="center">
   <img alt="version"  src="https://img.shields.io/badge/version-0.4.2-blue">
-  <img alt="size"     src="https://img.shields.io/badge/gzip-~10kB-brightgreen">
+  <img alt="size"     src="https://img.shields.io/badge/gzip-~20kB-brightgreen">
   <img alt="license"  src="https://img.shields.io/badge/license-MIT-lightgrey">
   <img alt="ts"       src="https://img.shields.io/badge/TypeScript-strict-3178c6">
 </p>
@@ -21,7 +21,7 @@
 
 | | Courvux | Alpine | Petite-Vue | Preact |
 |---|---|---|---|---|
-| Size (gzip) | ~10 KB | ~15 KB | ~6 KB | ~5 KB |
+| Size (gzip) | ~20 KB (full) | ~15 KB | ~6 KB | ~5 KB (core only) |
 | Reactivity | Proxy | Proxy | Proxy | Signals |
 | Virtual DOM | ❌ | ❌ | ❌ | ✅ |
 | Components | ✅ | Limited | ✅ | ✅ |
@@ -2556,7 +2556,7 @@ Produces:
 
 | File | Description |
 |---|---|
-| `dist/index.js` | Minified ES module (~10 kB gzip) |
+| `dist/index.js` | Minified ES module (~20 kB gzip with all features) |
 | `dist/index.d.ts` | TypeScript declarations |
 | `dist/types.d.ts` | Exported type definitions |
 | `dist/dom.d.ts` | DOM walk context types |

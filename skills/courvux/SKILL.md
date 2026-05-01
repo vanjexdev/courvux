@@ -10,15 +10,17 @@ description: >
 
 Lightweight reactive UI framework for the browser. No virtual DOM. ~20.7 KB gzip with everything (router, store, devtools, composables, useHead, SSR primitives). Vue/Alpine ergonomics.
 
+All paths below are relative to the repo root (`vanjexdev/courvux`).
+
 | | |
 |---|---|
-| Source | `/home/jesusuzcategui/WorkspaceNode/cv-framework/` |
-| Dist | `/home/jesusuzcategui/WorkspaceNode/cv-framework/dist/index.js` |
-| Docs site source | `/home/jesusuzcategui/WorkspaceNode/cv-framework/site/` |
-| Docs site output | `/home/jesusuzcategui/WorkspaceNode/cv-framework/docs/` (GH Pages) |
-| Examples | `/home/jesusuzcategui/WorkspaceNode/cv-framework/examples/` |
-| Changelog | `/home/jesusuzcategui/WorkspaceNode/cv-framework/CHANGELOG.md` |
-| Benchmarks | `/home/jesusuzcategui/WorkspaceNode/cv-framework/BENCHMARKS.md` |
+| Source | `src/` |
+| Dist | `dist/index.js` |
+| Docs site source | `site/` |
+| Docs site output | `docs/` (GH Pages) |
+| Examples | `examples/` |
+| Changelog | `CHANGELOG.md` |
+| Benchmarks | `BENCHMARKS.md` |
 | Current version | **0.4.2** |
 | Repo | `https://github.com/vanjexdev/courvux` |
 | Live docs | `https://vanjexdev.github.io/courvux/` |

@@ -7,6 +7,16 @@ Format: `[version] — date — description`
 
 ## [0.4.2] — 2026-05-01
 
+### Documentation
+
+#### Skill paths converted to repo-relative
+**File:** `skills/courvux/SKILL.md`
+The bundled Claude Code skill referenced absolute paths under `/home/jesusuzcategui/...` for source, dist, site, examples, etc. After cloning the repo and copying the skill into `~/.claude/skills/courvux/`, those paths don't exist on the user's machine. Replaced with repo-relative paths (`src/`, `dist/index.js`, `site/`, etc.) plus a header noting the convention.
+
+#### README size claim corrected (~10 KB → ~20 KB)
+**File:** `README.md`
+Header tagline, gzip badge, comparison table, and Building section all stated `~10 KB gzip`. The actual measured bundle is 20.7 KB gzip with everything (router, store, devtools, composables, useHead, SSR primitives) — the 10 KB figure dated from a much earlier core-only state. Updated to `~20 KB`, with the comparison-table cell labeled "(full)" so it's compared apples-to-apples against Alpine/Petite-Vue/Preact (~5–15 KB) which themselves include their respective runtimes.
+
 ### Performance fixes
 
 #### DevTools overlay drag forced reflow (~64ms)
