@@ -3,3 +3,5 @@ app/
 app-ssr/
 .codex
 coverage/
+examples/*/dist/
+examples/*/node_modules/

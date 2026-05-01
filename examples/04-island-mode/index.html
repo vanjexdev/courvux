@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Island mode — Courvux</title>
+    <style>
+        body {
+            margin: 0; padding: 2rem;
+            font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            line-height: 1.6; color: #222; max-width: 720px; margin-inline: auto;
+        }
+        h1 { margin-top: 0; }
+        h2 { margin-top: 2.5rem; padding-bottom: .35rem; border-bottom: 1px solid #e8e8e8; }
+        article { padding: 1.25rem 1.5rem; border: 1px solid #e8e8e8; border-radius: 8px; background: #fafafa; margin: 1rem 0; }
+        button {
+            font: inherit; padding: 6px 14px; cursor: pointer;
+            background: #111; color: #fff; border: none; border-radius: 6px;
+        }
+        button.ghost { background: #fff; color: #111; border: 1px solid #d4d4d4; }
+        input { font: inherit; padding: 6px 10px; border: 1px solid #d4d4d4; border-radius: 6px; }
+        .out { margin-top: .5rem; font-size: 13px; color: #555; }
+        [cv-cloak] { visibility: hidden; }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "courvux": "../../dist/index.js"
+      }
+    }
+    </script>
+</head>
+<body>
+    <h1>Island mode</h1>
+    <p>
+        This page is plain server-rendered HTML. No SPA shell, no hydration, no
+        single mount root. Each <code>cv-data</code> attribute below becomes its
+        own reactive island, upgraded by <code>autoInit()</code> on
+        <code>DOMContentLoaded</code>.
+    </p>
+
+    <h2>1. Counter island</h2>
+    <article cv-data="{ count: 0 }" cv-cloak>
+        <p>Clicked <strong>{{ count }}</strong> times.</p>
+        <button @click="count++">+1</button>
+        <button class="ghost" @click="count = 0">Reset</button>
+    </article>
+
+    <h2>2. Toggle island</h2>
+    <article cv-data="{ open: false }" cv-cloak>
+        <button @click="open = !open">{{ open ? 'Hide' : 'Show' }} details</button>
+        <p cv-show="open" class="out">Here are the details. They are reactive.</p>
+    </article>
+
+    <h2>3. Reverse-text island</h2>
+    <article cv-data="{ text: 'Hello, Courvux!' }" cv-cloak>
+        <input cv-model="text" placeholder="Type something" />
+        <p class="out">Reversed: <strong>{{ text.split('').reverse().join('') }}</strong></p>
+    </article>
+
+    <h2>4. Named-component island</h2>
+    <article cv-data="counter" cv-cloak>
+        <button @click="dec()">−</button>
+        <strong style="margin: 0 12px;">{{ n }}</strong>
+        <button @click="inc()">+</button>
+        <p class="out">Re-uses the registered <code>counter</code> component definition.</p>
+    </article>
+
+    <p style="margin-top:3rem; font-size:12px; color:#999;">
+        Each island is independent — they don't share state.
+        Surrounding HTML stays untouched.
+    </p>
+
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

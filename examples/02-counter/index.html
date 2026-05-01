@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Counter — Courvux</title>
+    <style>
+        body {
+            margin: 0; min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            background: #0f1115; color: #e6e6e6;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont;
+            -webkit-user-select: none; user-select: none;
+        }
+        .card { width: 320px; padding: 32px; border-radius: 12px; background: #181b22; border: 1px solid #232735; text-align: center; }
+        .count { font-size: 4rem; font-weight: 200; margin: 0 0 8px; line-height: 1; font-variant-numeric: tabular-nums; }
+        .label { font-size: 12px; color: #7d8597; letter-spacing: .08em; text-transform: uppercase; margin: 0 0 24px; }
+        .row { display: flex; gap: 8px; margin-bottom: 12px; }
+        button {
+            flex: 1; padding: 10px; font-family: inherit; font-size: 14px; font-weight: 500;
+            background: #232735; color: #e6e6e6; border: 1px solid transparent; border-radius: 8px; cursor: pointer;
+            transition: background .15s;
+        }
+        button:hover { background: #2c3142; }
+        button.primary { background: #4f7df0; border-color: #4f7df0; }
+        button.primary:hover { background: #5b8af5; }
+        .ghost { padding: 8px 12px; font-size: 12px; background: transparent; color: #7d8597; }
+        .ghost:hover { background: #1f2330; color: #e6e6e6; }
+        [cv-cloak] { visibility: hidden; }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "courvux": "../../dist/index.js"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div id="app" cv-cloak>
+        <div class="card">
+            <p class="count">{{ count }}</p>
+            <p class="label">{{ label }}</p>
+            <div class="row">
+                <button @click="dec()">−1</button>
+                <button @click="inc()" class="primary">+1</button>
+            </div>
+            <div class="row">
+                <button @click="add(10)">+10</button>
+                <button @click="add(-10)">−10</button>
+            </div>
+            <button class="ghost" @click="reset()">Reset</button>
+        </div>
+    </div>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

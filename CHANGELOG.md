@@ -45,6 +45,11 @@ By default, the plugin now reads the Vite-emitted `<outDir>/index.html` and uses
 **File:** `plugin/vite-plugin-courvux-ssg.js`
 New plugin option: `notFound: ComponentConfig | () => Promise<{default: ComponentConfig}>`. When provided, the plugin renders this component the same way as a regular route and writes the result to `<outDir>/404.html`. Static hosts (GitHub Pages, Netlify, Cloudflare Pages) serve this file for any unknown path, allowing the SPA to hydrate over a real 404 view instead of falling back to the host's generic page.
 
+#### SSG plugin `router` option (router-aware static rendering)
+**Files:** `plugin/vite-plugin-courvux-ssg.js`, `src/ssr.ts`
+- Plugin: new `router: { mode, base }` option. The plugin sets `window.location.href` to the route being rendered (so components can read `window.location.pathname` synchronously) and forwards the router shape to `renderPage`.
+- `renderPage`: new `options.router` argument. Injects a minimal router shape into the walk context so `<router-link>` emits the correct `href` (history-mode + base prefix) in statically generated HTML — fixing crawler-visible links that previously fell back to hash-mode in SSG output.
+
 ---
 
 ## [0.3.0] — 2026-04-29

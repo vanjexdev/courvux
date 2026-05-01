@@ -12,9 +12,12 @@ export default defineConfig({
         tailwindcss(),
         courvuxSsg({
             // Reuse the same routes that the client router consumes
-            routes: async () => (await import('./src/routes-data.js')).default,
-            baseUrl: 'https://vanjexdev.github.io/courvux',
+            routes:   async () => (await import('./src/routes-data.js')).default,
+            baseUrl:  'https://vanjexdev.github.io/courvux',
             notFound: async () => (await import('./src/pages/NotFound.js')).default,
+            // Match createRouter options in src/router.js so router-link
+            // emits correct hrefs in the static HTML.
+            router:   { mode: 'history', base: '/courvux' },
         }),
     ],
     resolve: {

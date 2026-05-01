@@ -66,6 +66,7 @@ export default function courvuxSsg(options = {}) {
         sitemap = true,
         skipDuringDev = true,
         notFound,
+        router,
     } = options;
 
     if (typeof routes !== 'function') {
@@ -155,6 +156,13 @@ export default function courvuxSsg(options = {}) {
 
                 for (const targetPath of pathsToEmit) {
                     try {
+                        // Set window.location to the route being rendered so
+                        // components can read pathname synchronously during
+                        // SSG (e.g. to resolve which slug they represent).
+                        // happy-dom updates location via .href assignment.
+                        const fullPath = (router?.base ?? '') + targetPath;
+                        try { window.location.href = `http://localhost${fullPath}`; } catch { /* */ }
+
                         await emitRoute({
                             targetPath,
                             component: route.component,
@@ -164,6 +172,7 @@ export default function courvuxSsg(options = {}) {
                             outDir: resolvedOutDir,
                             renderPage,
                             renderHeadToString,
+                            router,
                         });
                         emitted.push(targetPath);
                         console.log(`[courvux-ssg] ✓ ${targetPath}`);
@@ -214,12 +223,13 @@ async function emitRoute({
     outDir,
     renderPage,
     renderHeadToString,
+    router,
 }) {
     const resolvedComponent = typeof component === 'function'
         ? (await component()).default ?? (await component())
         : component;
 
-    const result = await renderPage(resolvedComponent);
+    const result = await renderPage(resolvedComponent, { router });
 
     // If the component did not declare any head via useHead and a fallback
     // is provided at the route level, use it.
