@@ -2,10 +2,10 @@ import { setHead } from '../seo.js';
 
 export default {
     data: {
-        install: `# From GitHub
-npm install github:vanjexdev/courvux
+        install: `# From GitHub — pin a tag for stable installs
+pnpm add github:vanjexdev/courvux#v0.4.1
 
-# or via pnpm
+# or rolling main
 pnpm add github:vanjexdev/courvux`,
         counter: `import { createApp } from 'courvux';
 
@@ -25,7 +25,7 @@ createApp({
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:1rem;">
                     <span style="font-size:2rem;">⚡</span>
                     <h1 style="font-size:2rem; font-weight:700; margin:0;">Courvux</h1>
-                    <span class="badge">v0.4.0</span>
+                    <span class="badge">v0.4.1</span>
                 </div>
                 <p style="font-size:1rem; color:#444; margin-bottom:1.5rem; max-width:560px; line-height:1.6;">
                     Lightweight reactive UI framework. No virtual DOM —
