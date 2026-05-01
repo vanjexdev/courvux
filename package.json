@@ -6,11 +6,13 @@
     "main": "dist/index.js",
     "exports": {
         ".": "./dist/index.js",
-        "./test-utils": "./dist/test-utils.js"
+        "./test-utils": "./dist/test-utils.js",
+        "./plugin": "./plugin/vite-plugin-courvux.js"
     },
     "types": "dist/index.d.ts",
     "files": [
-        "dist"
+        "dist",
+        "plugin"
     ],
     "scripts": {
         "dev:ts": "tsc -w",

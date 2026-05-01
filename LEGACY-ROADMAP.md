@@ -1,3 +1,12 @@
+# Legacy Roadmap (archived)
+
+> **This file documents an early state of the project.**
+> Most items listed here have already been resolved in v0.3.0.
+> See [`MissinThings.md`](./MissinThings.md) for current roadmap and status,
+> and [`CHANGELOG.md`](./CHANGELOG.md) for fixes shipped per release.
+
+---
+
 Aquí las falencias detalladas con contexto suficiente para resolverlas:
 
 ---
