@@ -49,6 +49,7 @@ export declare function renderPage(config: ComponentConfig, options?: {
         mode?: 'hash' | 'history';
         base?: string;
     };
+    components?: Record<string, ComponentConfig>;
 }): Promise<RenderedPage>;
 /**
  * Render head config to a HTML string suitable for placing inside `<head>`.
