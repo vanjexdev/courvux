@@ -5,6 +5,60 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.0] — 2026-05-01
+
+### Bug fixes
+
+#### `cv-if` / `cv-show` / interpolation never re-evaluate when their expression accesses a nested property (e.g. `items.length`)
+**File:** `src/dom.ts` — `subscribeDeps`
+The dep extractor matched the entire dotted path (`items.length`) as a single token and subscribed to that exact string. But the reactivity scope only notifies on the top-level state key — assigning a new array to `state.items` notifies `'items'`, never `'items.length'`. Subscribers registered on the dotted path therefore never fired, so any `cv-if`, `cv-show`, `cv-class`, interpolation, or `:attr` whose expression touched a nested property (`array.length`, `obj.someProp`, `user.name`, etc.) silently failed to react after the initial render.
+**Fix:** reduce each token to its root segment before subscribing, except for `$store.<path>` which is handled per-leaf by `subscribeExpr`. Existing tests didn't catch this because they used bare-key expressions (`show`, `count`); a regression test for `items.length > 0` was added.
+
+### Features
+
+#### `useHead` composable for per-component head management
+**File:** `src/head.ts`
+Per-route SEO metadata: `title`, `titleTemplate`, `meta`, `link`, `script`, `htmlAttrs`, `bodyAttrs`. Returns a cleanup function that reverts every tag it touched (existing tags' previous attrs are captured and restored). Dedupe rules: meta by `name`/`property`/`http-equiv`; link by `rel="canonical"` or `rel+href`. SSR-safe (no-op when `document` is unavailable). See README "SEO and `useHead`".
+
+#### Static Site Generation plugin (`courvux/plugin/ssg`)
+**Files:** `plugin/vite-plugin-courvux-ssg.js`, `src/ssr.ts`, `src/head.ts`
+Vite plugin that pre-renders Courvux routes to static HTML at build time. Each route emits its own `<path>/index.html` so crawlers and static hosts see real per-route HTML, not an empty SPA shell.
+- `useHead` calls during render are buffered (not applied to `document`) and inlined into the emitted page's `<head>` after dedupe.
+- Dynamic routes with `:param` opt in via a `prerender()` callback returning the concrete paths.
+- Emits `sitemap.xml` and `robots.txt` from the route list when `baseUrl` is provided.
+- Customizable shell template with `%head%`, `%app%`, `%mountId%` placeholders.
+
+#### `renderPage` and `renderHeadToString` (low-level SSG primitives)
+**File:** `src/ssr.ts`
+- `renderPage(config, opts) → { html, head }` — runs `onBeforeMount` and `onMount` (errors caught) and captures `useHead` calls during render.
+- `renderHeadToString(head) → string` — renders a `HeadConfig` to HTML for embedding in a page shell.
+- Both await async `onMount` so users can dynamic-import inside it.
+
+#### Router `base` option for subpath deployments
+**File:** `src/router.ts`, `src/dom.ts`, `src/types.ts`
+`createRouter(routes, { mode: 'history', base: '/myapp' })` — internal route paths stay clean (`/about`); the router prepends `base` when writing to history and strips it when reading `window.location`. `<router-link>` `href` is also rendered with the base prefix so server-rendered HTML and progressive enhancement work without JS. Required for SSG deployments under a subpath (e.g. GitHub Pages at `/<repo>/`).
+
+### Changes
+
+#### Head collection state moved to `globalThis`
+**File:** `src/head.ts`
+The SSG/SSR head buffer is now stored at `globalThis.__COURVUX_HEAD_COLLECTOR__`. Without this, when `useHead` is imported from a different module-cache slot (e.g. through a pnpm symlink) than the one used by `renderPage`, calls would land in a separate buffer and be silently dropped. Behavior in regular client runtime is unchanged.
+
+#### SSG plugin shell auto-detection
+**File:** `plugin/vite-plugin-courvux-ssg.js`
+By default, the plugin now reads the Vite-emitted `<outDir>/index.html` and uses it as the page shell — preserving hashed asset paths automatically. It strips per-page-overridable head tags (`<title>`, `<meta name="description">`, `<meta property="og:*">`, `<link rel="canonical">`) so the SSG-injected metadata does not duplicate the shell's. An explicit `template` option still overrides this behavior.
+
+#### SSG plugin `notFound` option for `404.html`
+**File:** `plugin/vite-plugin-courvux-ssg.js`
+New plugin option: `notFound: ComponentConfig | () => Promise<{default: ComponentConfig}>`. When provided, the plugin renders this component the same way as a regular route and writes the result to `<outDir>/404.html`. Static hosts (GitHub Pages, Netlify, Cloudflare Pages) serve this file for any unknown path, allowing the SPA to hydrate over a real 404 view instead of falling back to the host's generic page.
+
+#### SSG plugin `router` option (router-aware static rendering)
+**Files:** `plugin/vite-plugin-courvux-ssg.js`, `src/ssr.ts`
+- Plugin: new `router: { mode, base }` option. The plugin sets `window.location.href` to the route being rendered (so components can read `window.location.pathname` synchronously) and forwards the router shape to `renderPage`.
+- `renderPage`: new `options.router` argument. Injects a minimal router shape into the walk context so `<router-link>` emits the correct `href` (history-mode + base prefix) in statically generated HTML — fixing crawler-visible links that previously fell back to hash-mode in SSG output.
+
+---
+
 ## [0.3.0] — 2026-04-29
 
 ### Bug fixes

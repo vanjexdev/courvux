@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         s_dir: `// Full definition
@@ -141,5 +143,12 @@ autoInit({
                 <router-link to="/demo" style="font-size:13px; color:#111; font-weight:600;">TODO Demo →</router-link>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Advanced',
+            description: 'Custom directives, plugins, transitions, and the cv-data inline scope in Courvux.',
+            slug: '/advanced',
+        });
+    },
 };

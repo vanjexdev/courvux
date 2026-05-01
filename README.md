@@ -1,8 +1,36 @@
-# Courvux
+<p align="center">
+  <strong>Courvux</strong>
+  <br>
+  <em>Lightweight reactive UI framework for the browser.</em>
+  <br>
+  No virtual DOM. ~10 KB gzip. Vue/Alpine ergonomics. Built-in router, store, and DevTools.
+</p>
 
-Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM updates via Proxy-based reactivity. Ships as a single minified ES module (~10 kB gzip), no build step required.
+<p align="center">
+  <img alt="version"  src="https://img.shields.io/badge/version-0.4.0-blue">
+  <img alt="size"     src="https://img.shields.io/badge/gzip-~10kB-brightgreen">
+  <img alt="license"  src="https://img.shields.io/badge/license-MIT-lightgrey">
+  <img alt="ts"       src="https://img.shields.io/badge/TypeScript-strict-3178c6">
+</p>
 
-**Author:** Vanjex — **Version:** 0.2.0
+**Author:** Vanjex — **Version:** 0.4.0
+
+---
+
+## Comparison
+
+| | Courvux | Alpine | Petite-Vue | Preact |
+|---|---|---|---|---|
+| Size (gzip) | ~10 KB | ~15 KB | ~6 KB | ~5 KB |
+| Reactivity | Proxy | Proxy | Proxy | Signals |
+| Virtual DOM | ❌ | ❌ | ❌ | ✅ |
+| Components | ✅ | Limited | ✅ | ✅ |
+| Router | Built-in | ❌ | ❌ | External |
+| Store | Built-in | ❌ | ❌ | External |
+| DevTools | Built-in overlay | ❌ | ❌ | External |
+| SSR | ✅ (basic) | ❌ | ❌ | ✅ |
+| Composables | Built-in | External | External | External |
+| Vite plugin | ✅ | — | — | ✅ |
 
 ---
 
@@ -73,6 +101,15 @@ Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM
 - [Batch Updates — $batch](#batch-updates--batch)
 - [Error Boundaries — onError](#error-boundaries--onerror)
 - [Plugin System](#plugin-system)
+  - [Defining plugins with `createPlugin`](#defining-plugins-with-createplugin)
+- [Composables](#composables)
+- [SEO and `useHead`](#seo-and-usehead)
+- [Static Site Generation (SSG)](#static-site-generation-ssg)
+- [Event Bus](#event-bus)
+- [Reactivity escape hatches](#reactivity-escape-hatches)
+- [DevTools](#devtools)
+- [Server-Side Rendering (SSR)](#server-side-rendering-ssr)
+- [Testing](#testing)
 - [Progressive Web App (PWA)](#progressive-web-app-pwa)
   - [Web App Manifest](#web-app-manifest)
   - [Service Worker with Workbox](#service-worker-with-workbox)
@@ -80,6 +117,7 @@ Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM
 - [Building](#building)
 - [Development](#development)
 - [Known Limitations](#known-limitations)
+- [Top-level exports](#top-level-exports)
 
 ---
 
@@ -91,6 +129,12 @@ Lightweight reactive UI framework for the browser. No virtual DOM — direct DOM
 pnpm add github:vanjexdev/courvux
 # or
 npm install github:vanjexdev/courvux
+```
+
+Pin a tag for stable installs:
+
+```bash
+pnpm add github:vanjexdev/courvux#v0.4.0
 ```
 
 **Without a bundler** — use an import map:
@@ -111,6 +155,22 @@ npm install github:vanjexdev/courvux
 ```ts
 import { createApp } from 'courvux';
 ```
+
+### Vite plugin (recommended for any Vite-based project)
+
+The repo ships a Vite plugin that inlines `templateUrl` references at build time, eliminating runtime `fetch` calls for templates and enabling HMR on `.html` files in dev.
+
+```js
+// vite.config.js
+import { defineConfig } from 'vite';
+import courvux from 'courvux/plugin';
+
+export default defineConfig({
+    plugins: [courvux()]
+});
+```
+
+This makes the `templateUrl` pattern viable for production, eliminating the relative-path resolution issue noted in [Known Limitations](#known-limitations).
 
 ### Update
 
@@ -477,6 +537,19 @@ methods: {
 }
 ```
 
+**Dynamic refs in lists** — prefix with `:` to compute the ref name from an expression:
+
+```html
+<input cv-for="todo in todos" :key="todo.id"
+       :cv-ref="'edit_' + todo.id" />
+```
+
+Access with bracket notation:
+
+```js
+this.$refs['edit_' + someId]?.focus();
+```
+
 ### `cv-teleport`
 
 Moves the element to a different DOM node while keeping its reactivity.
@@ -567,6 +640,36 @@ app.component('my-counter', {
 ---
 
 ## Components
+
+### `defineComponent` (TypeScript)
+
+For TypeScript projects, `defineComponent` provides type inference for component config without runtime overhead — it's an identity function that helps the type checker understand the `this` binding inside methods/hooks.
+
+```ts
+import { defineComponent } from 'courvux';
+
+export const UserCard = defineComponent({
+    data: { name: '', age: 0 },
+    computed: {
+        label() { return `${this.name} (${this.age})`; }
+    },
+    template: `<p>{{ label }}</p>`
+});
+```
+
+### `defineAsyncComponent` for lazy loading
+
+```ts
+import { defineAsyncComponent } from 'courvux';
+
+const HeavyChart = defineAsyncComponent({
+    loader: () => import('./HeavyChart.js'),
+    loadingTemplate: '<div class="skeleton">Loading chart...</div>',
+    errorTemplate:   '<p class="error">Failed to load chart</p>',
+    delay: 200,
+    timeout: 5000,
+});
+```
 
 ### Defining components
 
@@ -1076,7 +1179,23 @@ async save() {
 }
 ```
 
+> **Standalone import:** `nextTick` is also exported as a top-level function for use outside component context (stores, plugins, test setup):
+>
+> ```js
+> import { nextTick } from 'courvux';
+> await nextTick();  // resolves after the next DOM flush
+> ```
+
 ---
+
+### `$dispatch` vs `$emit`
+
+| | Direction | Reach |
+|---|---|---|
+| `$emit(event, ...args)` | Parent only | One level |
+| `$dispatch(event, detail?, opts?)` | DOM bubble | Any DOM ancestor |
+
+Use `$emit` for normal parent-child communication. Use `$dispatch` when the event should travel multiple component levels without each parent re-emitting it manually.
 
 **`$dispatch` example:**
 
@@ -1753,6 +1872,25 @@ An `onError` hook catches errors thrown by any descendant component's `onMount`.
 
 ## Plugin System
 
+### Defining plugins with `createPlugin`
+
+The recommended API. `createPlugin` provides dedupe by `name` — installing the same plugin twice is a no-op.
+
+```ts
+import { createPlugin } from 'courvux';
+
+export const lucidePlugin = createPlugin({
+    name: 'lucide',
+    install(app) {
+        app.router?.afterEach(() => createIcons());
+    }
+});
+
+createApp(config).use(lucidePlugin).mount('#app');
+```
+
+### Raw plugin object (alternative)
+
 A plugin is an object with an `install(app)` method. Install before mounting.
 
 ```js
@@ -1825,6 +1963,402 @@ createApp({
 <i data-lucide="home"></i>
 <i data-lucide="star"></i>
 ```
+
+---
+
+## Composables
+
+Courvux ships a small set of composables covering common app needs without third-party dependencies. All preserve `this` binding, are SSR-safe, and integrate with `$addCleanup` for automatic teardown.
+
+| Composable | Purpose |
+|---|---|
+| `cvStorage(key, defaults)` | Reactive object backed by `localStorage`, auto-persists |
+| `cvFetch(url, callback, options)` | Reactive HTTP fetch with `{ data, loading, error }` callback |
+| `cvDebounce(fn, ms)` | Debounced function preserving `this` |
+| `cvThrottle(fn, ms)` | Throttled function preserving `this` |
+| `cvMediaQuery(query, callback)` | matchMedia with reactive callback |
+| `cvListener(target, event, handler, opts?)` | addEventListener with cleanup return |
+
+### Examples
+
+`cvStorage` for app settings:
+
+```js
+import { cvStorage } from 'courvux';
+
+const settings = cvStorage('app-settings', { theme: 'light', sidebar: true });
+settings.theme = 'dark';   // automatically persisted to localStorage
+settings.$clear();          // reset to defaults + remove from localStorage
+```
+
+`cvFetch` for reactive data:
+
+```js
+onMount() {
+    const { execute, abort } = cvFetch('/api/users', ({ data, loading, error }) => {
+        this.users = data ?? [];
+        this.loading = loading;
+        this.error = error;
+    });
+    this.$addCleanup(abort);
+}
+```
+
+`cvDebounce` inside a method:
+
+```js
+methods: {
+    search: cvDebounce(function(q) {
+        return fetch(`/search?q=${q}`)
+            .then(r => r.json())
+            .then(r => this.results = r);
+    }, 300)
+}
+```
+
+`cvMediaQuery` for responsive logic:
+
+```js
+onMount() {
+    cvMediaQuery('(max-width: 768px)', (matches) => {
+        this.isMobile = matches;
+    });
+}
+```
+
+`cvListener` with auto-cleanup:
+
+```js
+onMount() {
+    const off = cvListener(window, 'keydown', (e) => {
+        if (e.key === 'Escape') this.close();
+    });
+    this.$addCleanup(off);
+}
+```
+
+---
+
+## SEO and `useHead`
+
+`useHead` is the per-component head management composable. It updates `document.title`, inserts/upserts `<meta>` and `<link>` tags, and lets each route declare its own metadata. Tags are reverted on cleanup so navigating away from a route restores the previous head exactly.
+
+```js
+import { useHead } from 'courvux';
+
+export default {
+    onMount() {
+        const cleanup = useHead({
+            title: 'Installation',
+            titleTemplate: '%s — Courvux',
+            meta: [
+                { name: 'description', content: 'Get started with Courvux in under 60 seconds.' },
+                { property: 'og:title',       content: 'Installation — Courvux' },
+                { property: 'og:description', content: 'Get started with Courvux in under 60 seconds.' },
+                { property: 'og:image',       content: '/og/installation.png' },
+                { name: 'twitter:card',       content: 'summary_large_image' },
+            ],
+            link: [
+                { rel: 'canonical', href: 'https://courvux.dev/installation' },
+            ],
+        });
+        this.$addCleanup(cleanup);
+    }
+};
+```
+
+### Config shape
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | `string` | Replaces `document.title`. Restored on cleanup. |
+| `titleTemplate` | `string \| (t) => string` | String form: `%s` is replaced. Function form: receives the title and returns the final string. |
+| `meta` | `HeadMeta[]` | Each entry becomes a `<meta>` tag. Dedupe by `name`, then `property`, then `http-equiv`. |
+| `link` | `HeadLink[]` | Each entry becomes a `<link>` tag. `rel="canonical"` is unique. Other links dedupe by `rel + href`. |
+| `script` | `HeadScript[]` | Each entry becomes a `<script>` tag. Use `innerHTML` for inline content. Always inserted fresh — use sparingly. |
+| `htmlAttrs` | `Record<string,string>` | Sets attributes on `<html>` (e.g. `lang`, `class`). Restored on cleanup. |
+| `bodyAttrs` | `Record<string,string>` | Sets attributes on `<body>`. Restored on cleanup. |
+
+### JSON-LD structured data
+
+Inject Schema.org structured data via the `script` field:
+
+```js
+useHead({
+    script: [{
+        type: 'application/ld+json',
+        innerHTML: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareApplication',
+            name: 'Courvux',
+            applicationCategory: 'DeveloperApplication',
+            operatingSystem: 'Any',
+            offers: { '@type': 'Offer', price: '0' },
+        }),
+    }],
+});
+```
+
+### SSR safety
+
+`useHead` is a no-op when `document` is unavailable, so it's safe to call during SSR. SSG integration that captures these tags during `renderToString` for static HTML emission is on the roadmap.
+
+> **Tip — SEO baseline.** Pair `useHead` with `mode: 'history'` in the router so each route has a real URL the crawler can fetch. Hash routing (`#/path`) prevents servers and crawlers from seeing per-route content.
+
+---
+
+## Static Site Generation (SSG)
+
+Courvux ships a Vite plugin that pre-renders every route to its own `index.html` at build time. Crawlers, Open Graph previewers, and static hosts (GitHub Pages, Netlify, Cloudflare Pages) see real per-route HTML — not an empty SPA shell.
+
+The plugin captures `useHead` calls during render, so each emitted page has its correct `<title>`, meta tags, canonical link, and JSON-LD inlined into `<head>`. A `sitemap.xml` and `robots.txt` are emitted alongside.
+
+### Usage
+
+```js
+// vite.config.js
+import { defineConfig } from 'vite';
+import courvuxSsg from 'courvux/plugin/ssg';
+
+export default defineConfig({
+    plugins: [
+        courvuxSsg({
+            // Required — async function returning the route list.
+            // Each entry: { path, component, head?, prerender? }
+            routes: async () => (await import('./src/routes.js')).default,
+
+            // Site base URL — required for sitemap.xml + robots.txt
+            baseUrl: 'https://courvux.dev',
+
+            // Optional — page shell with %head%, %app%, %mountId% placeholders.
+            // Defaults to a minimal HTML5 shell.
+            // template: '<!doctype html>...',
+
+            // Optional — id of the mount root in the shell. Default: 'app'.
+            // mountId: 'app',
+
+            // Optional — also emit sitemap.xml + robots.txt. Default: true.
+            // sitemap: true,
+        }),
+    ],
+});
+```
+
+### Per-route options
+
+```js
+const routes = [
+    {
+        path: '/',
+        component: HomePage,
+        // Optional fallback head if the component does not call useHead
+        head: { title: 'Home — Courvux' }
+    },
+    {
+        path: '/installation',
+        component: InstallationPage,  // calls useHead({ title, meta, ... }) in onMount
+    },
+    {
+        // Dynamic route: the plugin calls prerender() to learn which paths to emit
+        path: '/blog/:slug',
+        component: BlogPost,
+        prerender: async () => {
+            const posts = await fetch('https://api.example.com/posts').then(r => r.json());
+            return posts.map(p => `/blog/${p.slug}`);
+        },
+    },
+];
+```
+
+### Output structure
+
+```
+dist/
+├── index.html                  ← /
+├── installation/index.html     ← /installation
+├── blog/
+│   ├── intro/index.html        ← /blog/intro (from prerender)
+│   └── faq/index.html          ← /blog/faq
+├── sitemap.xml
+└── robots.txt
+```
+
+### How head capture works
+
+During SSG, `useHead` calls are buffered instead of mutating the document. The plugin merges them per route, applies dedupe rules (same as runtime), and inlines them into the `<head>` of the emitted HTML. If a component does not call `useHead`, the route-level `head` field is used as a fallback.
+
+`onMount` is invoked during SSG so the standard `useHead` pattern works as-is. Errors thrown from `onMount` (e.g. for client-only APIs like `IntersectionObserver`) are caught and logged — guard SSR-incompatible code with `typeof window === 'undefined'`.
+
+### Programmatic API
+
+If you don't use Vite, the same primitives are exported:
+
+```js
+import { renderPage, renderHeadToString } from 'courvux';
+
+const { html, head } = await renderPage(componentConfig);
+const headHtml = renderHeadToString(head);
+// → embed `headHtml` in your shell, then `html` in the mount root
+```
+
+---
+
+## Event Bus
+
+For cross-component signals that don't belong in the store (analytics events, IPC bridges, plugin hooks), Courvux exports a typed event bus:
+
+```ts
+import { createEventBus, type EventBus } from 'courvux';
+
+interface AppEvents {
+    'user:login':  { id: string; name: string };
+    'cart:update': { count: number };
+}
+
+const bus: EventBus<AppEvents> = createEventBus();
+
+const off = bus.on('user:login', payload => { /* ... */ });
+bus.emit('user:login', { id: '1', name: 'Alice' });
+bus.once('cart:update', payload => { /* fires once */ });
+off();                       // unsubscribe
+bus.clear('user:login');     // clear all listeners for an event
+```
+
+Provide it via `createApp({ provide: { bus } })` and `inject` in components.
+
+---
+
+## Reactivity escape hatches
+
+```js
+import { markRaw, toRaw, readonly, batchUpdate } from 'courvux';
+```
+
+| Helper | Use case |
+|---|---|
+| `markRaw(obj)` | Skip Proxy wrapping (third-party class instances like Chart.js or xterm.js controllers) |
+| `toRaw(reactive)` | Get the underlying non-Proxy object (serialization, `JSON.stringify`, deep equality) |
+| `readonly(obj)` | Wrap so writes are silently ignored (use for `provide` values that shouldn't mutate downstream) |
+| `batchUpdate(fn)` | Group multiple mutations into one DOM flush — see [Batch Updates](#batch-updates--batch) |
+
+```js
+{
+    data: {
+        chart: markRaw(new Chart(canvas, opts)),  // not made reactive — internal slots stay intact
+    }
+}
+```
+
+Native built-ins like `Date`, `Map`, `Set`, `RegExp`, and typed arrays are automatically skipped from Proxy wrapping (they rely on internal slots that break under Proxy).
+
+---
+
+## DevTools
+
+Courvux ships an in-app DevTools panel — no browser extension required. It mounts a draggable badge in the corner of the page that opens a panel showing all mounted components, their reactive state, and the global store, with **inline live editing**: click any value to edit it, press Enter to commit.
+
+```js
+import { createApp, setupDevTools, mountDevOverlay } from 'courvux';
+
+const app = createApp(config);
+
+if (import.meta.env.DEV) {
+    const hook = setupDevTools();
+    mountDevOverlay(hook);
+}
+
+await app.mount('#app');
+```
+
+The hook is also exposed at `window.__COURVUX_DEVTOOLS__` for use by external tooling (a Chrome extension is on the roadmap).
+
+**Hook API:**
+
+```ts
+interface DevToolsHook {
+    instances: DevToolsComponentInstance[];
+    stores: DevToolsStoreEntry[];
+    on(event: 'mount' | 'update' | 'destroy' | 'store-update', cb): () => void;
+}
+```
+
+Each instance exposes `getState()`, `setState(key, value)`, and `subscribe(cb)` for programmatic introspection.
+
+---
+
+## Server-Side Rendering (SSR)
+
+Courvux supports basic SSR via `renderToString`, plus client-side hydration. Requires `jsdom` or `happy-dom` as a peer dependency on the server.
+
+```js
+// server.js
+import { JSDOM } from 'jsdom';
+const { window } = new JSDOM('<!DOCTYPE html><html><body></body></html>');
+globalThis.document = window.document;
+globalThis.window = window;
+
+import { renderToString } from 'courvux';
+const html = await renderToString(myConfig, { data: { /* SSR data */ } });
+// → '<root data-courvux-ssr="true">Hello</root>'
+```
+
+The client-side `mount()` automatically detects `data-courvux-ssr` and hydrates instead of re-rendering. SSR is currently best-suited to small static sites and SSG; it's not yet optimized for high-throughput SSR servers.
+
+**SSR-related exports:**
+
+| Export | Purpose |
+|---|---|
+| `renderToString(config, opts?)` | Renders a component config to an HTML string |
+| `SSR_ATTR` | The hydration marker attribute (`data-courvux-ssr`) — useful for tooling |
+
+A first-class SSG plugin (`courvux/plugin/ssg`) that pre-renders every static route at build time is on the roadmap.
+
+---
+
+## Testing
+
+Courvux exports a Vitest-compatible test utility from `'courvux/test-utils'`:
+
+```js
+import { mount } from 'courvux/test-utils';
+import { describe, it, expect } from 'vitest';
+
+describe('counter', () => {
+    it('increments on click', async () => {
+        const w = await mount({
+            template: '<button @click="count++">{{ count }}</button>',
+            data: { count: 0 }
+        });
+
+        w.find('button').click();
+        await w.nextTick();
+        expect(w.find('button').textContent).toBe('1');
+
+        w.destroy();
+    });
+});
+```
+
+Run with `vitest`. The recommended test environment is `happy-dom`:
+
+```js
+// vitest.config.js
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+    test: { environment: 'happy-dom' }
+});
+```
+
+The wrapper exposes:
+
+| Method | Description |
+|---|---|
+| `state` | The mounted reactive state |
+| `find(selector)` | First matching element inside the mount |
+| `findAll(selector)` | All matching elements |
+| `nextTick()` | Wait for the next DOM flush |
+| `destroy()` | Tear down the mount |
 
 ---
 
@@ -2051,4 +2585,60 @@ The dev server (`devserver.js`) serves:
 | CSP / `new Function` | Expression evaluation and inline event handlers use `new Function`. Falls back to a safe evaluator (property access + literals only) under strict CSP — complex JS expressions in templates won't work. |
 | `cv-for` without `:key` | Without a `:key`, any change to a tracked array/object destroys and recreates all list nodes. Use `:key="item.id"` to enable keyed reconciliation — only changed/added/removed nodes are touched. |
 | `cv-for` array mutation | Courvux detects array reassignment (`items = newArray`) and does a full keyed diff. Direct array mutations like `items.push(x)` or `items[0].name = 'x'` also trigger reactively via the deep Proxy, but the diff still runs over the full list. Intercepting specific mutations (push/splice) for O(1) DOM ops is not yet implemented. |
-| SSR | Not supported. Courvux is browser-only. |
+| Self-closing custom elements | `<my-comp />` is **not** valid for custom elements — HTML5 parser ignores the trailing `/`, leaving the element open and swallowing its siblings. Always use explicit closing tags: `<my-comp></my-comp>`. |
+| SSR scope | Basic SSR + hydration is supported via `renderToString`, and route pre-rendering is shipped via `courvux/plugin/ssg`. Neither is yet optimized for high-throughput SSR servers — the use case targeted today is SSG / static export, not per-request server rendering. |
+
+---
+
+## Top-level exports
+
+Everything exported from `'courvux'` (v0.4.0):
+
+**App & lifecycle:**
+`createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
+
+**Router & store:**
+`createRouter`, `createStore`
+
+**Reactivity:**
+`batchUpdate`, `markRaw`, `toRaw`, `readonly`
+
+**Composables:**
+`cvStorage`, `cvFetch`, `cvDebounce`, `cvThrottle`, `cvMediaQuery`, `cvListener`
+
+**Event bus:**
+`createEventBus`
+
+**DevTools:**
+`setupDevTools`, `mountDevOverlay`
+
+**SSR / SSG:**
+`renderToString`, `renderPage`, `renderHeadToString`, `SSR_ATTR`
+
+**SEO:**
+`useHead`
+
+**Subpath exports:**
+
+| Path | Purpose |
+|---|---|
+| `'courvux'` | Main runtime |
+| `'courvux/test-utils'` | Vitest helpers (`mount`) |
+| `'courvux/plugin'` | Vite plugin for `templateUrl` inlining |
+| `'courvux/plugin/ssg'` | Vite plugin for static site generation |
+
+## Examples
+
+Self-contained example projects in [`examples/`](./examples/):
+
+| # | Example | What it shows |
+|---|---|---|
+| [01](./examples/01-todomvc/) | TodoMVC | Components, computed, watchers, deep persistence, keyed `cv-for`, dynamic `:cv-ref` |
+| [02](./examples/02-counter/) | Counter | Smallest possible Courvux app — drop into Tauri / Electron / mobile webview |
+| [03](./examples/03-ssg-blog/) | SSG blog | `useHead`, `courvux/plugin/ssg`, history mode, sitemap, dynamic-route prerender |
+| [04](./examples/04-island-mode/) | Island mode | `autoInit()` upgrading `cv-data` islands inside server-rendered HTML |
+
+See [BENCHMARKS.md](./BENCHMARKS.md) for bundle-size comparisons and the methodology for cross-framework runtime benchmarks.
+
+**Type exports** (`import type`):
+`AppConfig`, `ComponentConfig`, `RouteConfig`, `Router`, `RouteMatch`, `RouteActivation`, `NavigationGuard`, `ScrollBehavior`, `WatcherEntry`, `WatcherOptions`, `DirectiveBinding`, `DirectiveDef`, `DirectiveShorthand`, `LazyComponent`, `ComputedDef`, `EventBus`, `FetchState`, `FetchOptions`, `DevToolsHook`, `DevToolsComponentInstance`, `DevToolsStoreEntry`, `StoreConfig`, `HeadConfig`, `HeadMeta`, `HeadLink`, `HeadScript`, `RenderedPage`

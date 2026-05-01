@@ -9,6 +9,7 @@ export type RouteActivation = {
 type MountFn = (el: HTMLElement, config: ComponentConfig, route: RouteMatch, layout?: string, childRouter?: Router) => Promise<RouteActivation>;
 export declare function createRouter(routes: RouteConfig[], options?: {
     mode?: 'hash' | 'history';
+    base?: string;
     transition?: string;
     beforeEach?: NavigationGuard;
     afterEach?: (to: RouteMatch, from: RouteMatch | null) => void;

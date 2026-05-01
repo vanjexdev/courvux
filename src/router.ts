@@ -103,16 +103,19 @@ const runComponentLeaveGuard = (activation: RouteActivation | null, to: RouteMat
 
 export function createRouter(routes: RouteConfig[], options: {
     mode?: 'hash' | 'history';
+    base?: string;
     transition?: string;
     beforeEach?: NavigationGuard;
     afterEach?: (to: RouteMatch, from: RouteMatch | null) => void;
     scrollBehavior?: ScrollBehavior;
 } = {}): Router {
     const mode = options.mode ?? 'hash';
+    const base = normalizeBase(options.base ?? '');
 
     const router: Router = {
         routes: normalizeRoutes(routes),
         mode,
+        base,
         transition: options.transition,
         beforeEach: options.beforeEach,
         afterEach: options.afterEach,
@@ -120,7 +123,7 @@ export function createRouter(routes: RouteConfig[], options: {
         navigate(path: string, options?: { query?: Record<string, string> }) {
             const full = buildUrl(path, options?.query);
             if (mode === 'history') {
-                history.pushState({}, '', full);
+                history.pushState({}, '', `${base}${full}`);
                 window.dispatchEvent(new PopStateEvent('popstate'));
             } else {
                 window.location.hash = full;
@@ -129,11 +132,11 @@ export function createRouter(routes: RouteConfig[], options: {
         replace(path: string, options?: { query?: Record<string, string> }) {
             const full = buildUrl(path, options?.query);
             if (mode === 'history') {
-                history.replaceState({}, '', full);
+                history.replaceState({}, '', `${base}${full}`);
                 window.dispatchEvent(new PopStateEvent('popstate'));
             } else {
-                const base = window.location.href.split('#')[0];
-                window.location.replace(`${base}#${full}`);
+                const baseHref = window.location.href.split('#')[0];
+                window.location.replace(`${baseHref}#${full}`);
             }
         },
         back() {
@@ -145,6 +148,22 @@ export function createRouter(routes: RouteConfig[], options: {
     };
 
     return router;
+}
+
+// Normalize: strip trailing slash; ensure leading slash if non-empty
+function normalizeBase(base: string): string {
+    if (!base || base === '/') return '';
+    let b = base.startsWith('/') ? base : `/${base}`;
+    if (b.endsWith('/')) b = b.slice(0, -1);
+    return b;
+}
+
+/** Strip the router's base prefix from a pathname. Returns at least '/'. */
+function stripBase(pathname: string, base: string): string {
+    if (!base) return pathname || '/';
+    if (pathname === base) return '/';
+    if (pathname.startsWith(base + '/')) return pathname.slice(base.length) || '/';
+    return pathname || '/';
 }
 
 function buildUrl(path: string, query?: Record<string, string>): string {
@@ -161,8 +180,9 @@ function parseQuery(search: string): Record<string, string> {
 }
 
 export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn, name = 'default', onFirstRender?: () => void): () => void {
+    const base = router.base ?? '';
     const getCurrentPath = () => {
-        if (router.mode === 'history') return window.location.pathname;
+        if (router.mode === 'history') return stripBase(window.location.pathname, base);
         const hash = window.location.hash.slice(1) || '/';
         return hash.split('?')[0] || '/';
     };
@@ -266,6 +286,7 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
                                     const childRouter: Router = {
                                         routes: route.children!,
                                         mode: router.mode,
+                                        base: router.base,
                                         transition: route.transition ?? router.transition,
                                         beforeEach: router.beforeEach,
                                         afterEach: router.afterEach,

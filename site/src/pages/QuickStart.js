@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         s1: `import { createApp } from 'courvux';
@@ -95,5 +97,12 @@ createApp({ store, router, template: '<router-view />' }).mount('#app');`,
                 <router-link to="/template" style="font-size:13px; color:#111; font-weight:600;">Template Syntax →</router-link>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Quick Start',
+            description: 'Build your first reactive Courvux app — counter example, methods, computed properties.',
+            slug: '/quick-start',
+        });
+    },
 };

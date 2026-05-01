@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-BEmnmV32.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-3jZkDEi8.css">
+    <title>Store — Courvux</title>
+    <meta name="description" content="Global reactive state in Courvux with createStore, modules, and namespaced actions.">
+    <meta property="og:title" content="Store — Courvux">
+    <meta property="og:description" content="Global reactive state in Courvux with createStore, modules, and namespaced actions.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/store">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Store — Courvux">
+    <meta name="twitter:description" content="Global reactive state in Courvux with createStore, modules, and namespaced actions.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/store">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>Store</h1>
+            <p>A global reactive state container. Access via <code>$store</code> in any template or component.</p>
+
+            <h2>createStore</h2>
+            <code-block :lang="'js'" :code="s1" lang="js"></code-block>
+
+            <h2>Accessing store in templates</h2>
+            <code-block :lang="'html'" :code="s2" lang="html"></code-block>
+
+            <h2>Store modules</h2>
+            <p>Organize into namespaced sub-stores. Each module is a full standalone store. State and action names in each module must be distinct.</p>
+            <code-block :lang="'js'" :code="s3" lang="js"></code-block>
+            <code-block :lang="'html'" :code="s4" lang="html"></code-block>
+
+            <h2>batchUpdate — bulk mutations</h2>
+            <code-block :lang="'js'" :code="s5" lang="js"></code-block>
+
+            <h2>Provide / Inject</h2>
+            <p>Alternative to the store for passing values deep into the tree without threading props through every level.</p>
+            <code-block :lang="'js'" :code="s6" lang="js"></code-block>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="/courvux/router" class="">← Router</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="/courvux/advanced" class="">Advanced →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

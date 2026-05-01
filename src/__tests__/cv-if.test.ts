@@ -41,4 +41,21 @@ describe('cv-if / cv-else-if / cv-else', () => {
         expect(w.text()).toBe('two');
         w.destroy();
     });
+
+    it('cv-if reacts to expressions involving nested property access (e.g. items.length)', async () => {
+        const w = await mount({
+            template: '<p cv-if="items.length > 0">have</p><p cv-else>empty</p>',
+            data: { items: [] as number[] }
+        });
+        expect(w.text()).toBe('empty');
+
+        w.state.items = [1, 2, 3];
+        await w.nextTick();
+        expect(w.text()).toBe('have');
+
+        w.state.items = [];
+        await w.nextTick();
+        expect(w.text()).toBe('empty');
+        w.destroy();
+    });
 });

@@ -180,7 +180,9 @@ var subscribeExpr = (expr, context, cb) => {
 var subscribeDeps = (expr, context, cb) => {
   const keywords = /* @__PURE__ */ new Set(["true", "false", "null", "undefined", "in", "of", "typeof", "instanceof"]);
   const tokens = expr.match(/\$?[a-zA-Z_][\w$]*(?:\.\$?[a-zA-Z_][\w$]*)*/g) ?? [];
-  const deps = [...new Set(tokens.filter((t) => !keywords.has(t.split(".")[0])))];
+  const deps = [...new Set(
+    tokens.map((t) => t.startsWith("$store.") ? t : t.split(".")[0]).filter((t) => !keywords.has(t))
+  )];
   if (deps.length === 0) return () => {
   };
   const unsubs = deps.map((dep) => subscribeExpr(dep, context, cb));
@@ -1151,11 +1153,18 @@ async function walk(el, state, context) {
       Array.from(element.attributes).forEach((attr) => {
         if (attr.name !== "to" && attr.name !== ":to") a.setAttribute(attr.name, attr.value);
       });
-      const getCurrentPath = () => context.router?.mode === "history" ? window.location.pathname : window.location.hash.slice(1) || "/";
+      const routerBase = context.router?.base ?? "";
+      const stripBaseLocal = (p) => {
+        if (!routerBase) return p || "/";
+        if (p === routerBase) return "/";
+        if (p.startsWith(routerBase + "/")) return p.slice(routerBase.length) || "/";
+        return p || "/";
+      };
+      const getCurrentPath = () => context.router?.mode === "history" ? stripBaseLocal(window.location.pathname) : window.location.hash.slice(1) || "/";
       const updateActive = () => {
         const to = getTo();
         const isActive = getCurrentPath() === to;
-        if (context.router?.mode === "history") a.href = to;
+        if (context.router?.mode === "history") a.href = `${routerBase}${to}`;
         else a.href = `#${to}`;
         if (isActive) {
           a.setAttribute("aria-current", "page");
@@ -1481,6 +1490,12 @@ var runComponentLeaveGuard = (activation, to) => {
   if (!activation?.beforeLeave) return Promise.resolve(void 0);
   return new Promise((resolve2) => activation.beforeLeave(to, resolve2));
 };
+function stripBase(pathname, base) {
+  if (!base) return pathname || "/";
+  if (pathname === base) return "/";
+  if (pathname.startsWith(base + "/")) return pathname.slice(base.length) || "/";
+  return pathname || "/";
+}
 function parseQuery(search) {
   if (!search) return {};
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -1491,8 +1506,9 @@ function parseQuery(search) {
   return out;
 }
 function setupRouterView(el, router, mount3, name = "default", onFirstRender) {
+  const base = router.base ?? "";
   const getCurrentPath = () => {
-    if (router.mode === "history") return window.location.pathname;
+    if (router.mode === "history") return stripBase(window.location.pathname, base);
     const hash = window.location.hash.slice(1) || "/";
     return hash.split("?")[0] || "/";
   };
@@ -1603,6 +1619,7 @@ function setupRouterView(el, router, mount3, name = "default", onFirstRender) {
                   const childRouter = {
                     routes: route.children,
                     mode: router.mode,
+                    base: router.base,
                     transition: route.transition ?? router.transition,
                     beforeEach: router.beforeEach,
                     afterEach: router.afterEach,
@@ -1755,7 +1772,7 @@ function nextDevToolsId() {
 }
 
 // src/overlay.ts
-var CSS = `
+var CSS2 = `
 #cvd{position:fixed;bottom:16px;right:16px;z-index:2147483647;font-family:monospace;font-size:12px;line-height:1.4}
 #cvd *{box-sizing:border-box;margin:0;padding:0}
 #cvd-badge{background:#5b4cf5;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.5px;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.4)}
@@ -1798,7 +1815,7 @@ function injectCss() {
   if (document.getElementById("cvd-styles")) return;
   const s = document.createElement("style");
   s.id = "cvd-styles";
-  s.textContent = CSS;
+  s.textContent = CSS2;
   document.head.appendChild(s);
 }
 function formatVal(v) {

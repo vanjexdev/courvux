@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         s_define: `createApp({
@@ -135,5 +137,12 @@ methods: {
                 <router-link to="/reactivity" style="font-size:13px; color:#111; font-weight:600;">Reactivity →</router-link>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Components',
+            description: 'Define, register, and compose Courvux components with props, slots, emits, and scoped slots.',
+            slug: '/components',
+        });
+    },
 };
