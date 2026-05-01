@@ -73,7 +73,16 @@ export const subscribeExpr = (expr: string, context: WalkContext, cb: Function):
 export const subscribeDeps = (expr: string, context: WalkContext, cb: Function): (() => void) => {
     const keywords = new Set(['true', 'false', 'null', 'undefined', 'in', 'of', 'typeof', 'instanceof']);
     const tokens = expr.match(/\$?[a-zA-Z_][\w$]*(?:\.\$?[a-zA-Z_][\w$]*)*/g) ?? [];
-    const deps = [...new Set(tokens.filter(t => !keywords.has(t.split('.')[0])))];
+    // Reactivity notifies on the top-level state key only (mutations to
+    // nested properties propagate via deep-proxy notify of the parent key),
+    // so subscribers for `items.length` would never fire if registered on
+    // the dotted path. Reduce each dotted token to its root segment, except
+    // for `$store.<path>` which subscribeExpr handles specially per-leaf.
+    const deps = [...new Set(
+        tokens
+            .map(t => t.startsWith('$store.') ? t : t.split('.')[0])
+            .filter(t => !keywords.has(t))
+    )];
     if (deps.length === 0) return () => {};
     const unsubs = deps.map(dep => subscribeExpr(dep, context, cb));
     return () => unsubs.forEach(u => u());

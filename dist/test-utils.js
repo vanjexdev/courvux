@@ -180,7 +180,9 @@ var subscribeExpr = (expr, context, cb) => {
 var subscribeDeps = (expr, context, cb) => {
   const keywords = /* @__PURE__ */ new Set(["true", "false", "null", "undefined", "in", "of", "typeof", "instanceof"]);
   const tokens = expr.match(/\$?[a-zA-Z_][\w$]*(?:\.\$?[a-zA-Z_][\w$]*)*/g) ?? [];
-  const deps = [...new Set(tokens.filter((t) => !keywords.has(t.split(".")[0])))];
+  const deps = [...new Set(
+    tokens.map((t) => t.startsWith("$store.") ? t : t.split(".")[0]).filter((t) => !keywords.has(t))
+  )];
   if (deps.length === 0) return () => {
   };
   const unsubs = deps.map((dep) => subscribeExpr(dep, context, cb));

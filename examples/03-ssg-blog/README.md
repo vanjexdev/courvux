@@ -5,11 +5,15 @@ A small static blog built with `courvux/plugin/ssg`. Each post is pre-rendered t
 ## Run
 
 ```bash
-pnpm install
+pnpm install      # symlinks courvux from the parent repo
 pnpm dev          # Vite dev server with HMR
 pnpm build        # produces dist/ — ready for any static host
 pnpm preview      # serve the built dist/ locally
 ```
+
+> **Important:** run the commands from inside this directory (`examples/03-ssg-blog/`), not from the repo root. The example has its own `package.json` and depends on the local Courvux via `link:../..`.
+
+> **Don't try to open `index.html` directly with a plain static server from a parent directory** — the `<script type="module">` tag uses ES-module imports (e.g. `import { createApp } from 'courvux'`) which only resolve under Vite's dev/build pipeline.
 
 ## Structure
 
