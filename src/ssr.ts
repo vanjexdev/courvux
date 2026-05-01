@@ -29,9 +29,9 @@ import {
 
 export const SSR_ATTR = 'data-courvux-ssr';
 
-async function runWalkSSR(el: Element, state: any): Promise<void> {
+async function runWalkSSR(el: Element, state: any, extraContext: Record<string, any> = {}): Promise<void> {
     const { subscribe } = createReactivityScope();
-    const context = { subscribe, refs: {} };
+    const context = { subscribe, refs: {}, ...extraContext };
     await walk(el as any, state, context as any);
 }
 
@@ -115,7 +115,7 @@ export interface RenderedPage {
  */
 export async function renderPage(
     config: ComponentConfig,
-    options: { data?: Record<string, any> } = {}
+    options: { data?: Record<string, any>; router?: { mode?: 'hash' | 'history'; base?: string } } = {}
 ): Promise<RenderedPage> {
     _startHeadCollection();
     let html = '';
@@ -133,8 +133,18 @@ export async function renderPage(
 
         state = buildState({ ...config, data: { ...config.data, ...options.data } });
 
+        // Inject a minimal router shape so router-link renders mode-aware
+        // hrefs (history-mode + base prefix) in the emitted HTML.
+        const extraCtx: Record<string, any> = {};
+        if (options.router) {
+            extraCtx.router = {
+                mode: options.router.mode ?? 'history',
+                base: options.router.base ?? '',
+            };
+        }
+
         try { await config.onBeforeMount?.call(state); } catch { /* */ }
-        if (template) await runWalkSSR(wrapper, state);
+        if (template) await runWalkSSR(wrapper, state, extraCtx);
         try { await config.onMount?.call(state); } catch { /* SSR-incompatible onMount work */ }
 
         const root = wrapper.firstElementChild;

@@ -2629,5 +2629,18 @@ Everything exported from `'courvux'` (v0.3.0):
 | `'courvux/plugin'` | Vite plugin for `templateUrl` inlining |
 | `'courvux/plugin/ssg'` | Vite plugin for static site generation |
 
+## Examples
+
+Self-contained example projects in [`examples/`](./examples/):
+
+| # | Example | What it shows |
+|---|---|---|
+| [01](./examples/01-todomvc/) | TodoMVC | Components, computed, watchers, deep persistence, keyed `cv-for`, dynamic `:cv-ref` |
+| [02](./examples/02-counter/) | Counter | Smallest possible Courvux app — drop into Tauri / Electron / mobile webview |
+| [03](./examples/03-ssg-blog/) | SSG blog | `useHead`, `courvux/plugin/ssg`, history mode, sitemap, dynamic-route prerender |
+| [04](./examples/04-island-mode/) | Island mode | `autoInit()` upgrading `cv-data` islands inside server-rendered HTML |
+
+See [BENCHMARKS.md](./BENCHMARKS.md) for bundle-size comparisons and the methodology for cross-framework runtime benchmarks.
+
 **Type exports** (`import type`):
 `AppConfig`, `ComponentConfig`, `RouteConfig`, `Router`, `RouteMatch`, `RouteActivation`, `NavigationGuard`, `ScrollBehavior`, `WatcherEntry`, `WatcherOptions`, `DirectiveBinding`, `DirectiveDef`, `DirectiveShorthand`, `LazyComponent`, `ComputedDef`, `EventBus`, `FetchState`, `FetchOptions`, `DevToolsHook`, `DevToolsComponentInstance`, `DevToolsStoreEntry`, `StoreConfig`, `HeadConfig`, `HeadMeta`, `HeadLink`, `HeadScript`, `RenderedPage`

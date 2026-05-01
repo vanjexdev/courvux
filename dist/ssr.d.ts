@@ -45,6 +45,10 @@ export interface RenderedPage {
  */
 export declare function renderPage(config: ComponentConfig, options?: {
     data?: Record<string, any>;
+    router?: {
+        mode?: 'hash' | 'history';
+        base?: string;
+    };
 }): Promise<RenderedPage>;
 /**
  * Render head config to a HTML string suitable for placing inside `<head>`.

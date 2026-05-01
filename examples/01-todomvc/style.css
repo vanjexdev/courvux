@@ -1,0 +1,186 @@
+* { box-sizing: border-box; }
+
+[cv-cloak] { display: none !important; }
+
+body {
+    margin: 0;
+    background: #f5f5f5;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 14px;
+    color: #4d4d4d;
+    min-height: 100vh;
+}
+
+.todoapp {
+    background: #fff;
+    margin: 80px auto 40px;
+    max-width: 550px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06), 0 25px 50px rgba(0,0,0,0.08);
+    position: relative;
+}
+
+.todoapp h1 {
+    font-size: 80px;
+    font-weight: 200;
+    text-align: center;
+    color: rgba(175,47,47,0.15);
+    margin: 0;
+    padding: 16px 0 8px;
+}
+
+.new-todo {
+    width: 100%;
+    padding: 16px 16px 16px 60px;
+    border: none;
+    background: rgba(0,0,0,0.003);
+    box-shadow: inset 0 -2px 1px rgba(0,0,0,0.03);
+    font-size: 22px;
+    font-family: inherit;
+    line-height: 1.4;
+    color: inherit;
+    outline: none;
+}
+
+.main {
+    border-top: 1px solid #e6e6e6;
+    position: relative;
+}
+
+#toggle-all { display: none; }
+#toggle-all + label {
+    position: absolute;
+    top: -52px;
+    left: 12px;
+    width: 45px;
+    height: 34px;
+    text-align: center;
+    line-height: 34px;
+    font-size: 0;
+    cursor: pointer;
+}
+#toggle-all + label::before {
+    content: '❯';
+    font-size: 22px;
+    color: #e6e6e6;
+    transform: rotate(90deg);
+    display: inline-block;
+}
+#toggle-all:checked + label::before { color: #777; }
+
+.todo-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.todo-list li {
+    border-bottom: 1px solid #ededed;
+    position: relative;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+}
+.todo-list li:last-child { border-bottom: none; }
+
+.todo-list .view {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    padding: 14px 12px 14px 60px;
+    gap: 12px;
+    position: relative;
+}
+.todo-list .toggle {
+    position: absolute;
+    left: 16px;
+    width: 30px;
+    height: 30px;
+    appearance: none;
+    border: 1px solid #ededed;
+    border-radius: 50%;
+    cursor: pointer;
+}
+.todo-list .toggle:checked {
+    border-color: #5dc2af;
+    background: #5dc2af no-repeat center;
+    background-size: 60%;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='3' d='M5 12l5 5 9-9'/%3E%3C/svg%3E");
+}
+.todo-list label {
+    flex: 1;
+    font-weight: 400;
+    color: #484848;
+    cursor: text;
+    user-select: none;
+    word-break: break-all;
+}
+.todo-list .completed label {
+    color: #cdcdcd;
+    text-decoration: line-through;
+}
+.todo-list .destroy {
+    background: none;
+    border: none;
+    color: #cc9a9a;
+    font-size: 24px;
+    cursor: pointer;
+    width: 30px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity .15s;
+}
+.todo-list li:hover .destroy { opacity: 1; }
+.todo-list .destroy::after { content: '×'; }
+
+.todo-list .edit {
+    width: calc(100% - 60px);
+    padding: 12px 16px;
+    margin-left: 44px;
+    border: 1px solid #999;
+    font-size: 18px;
+    font-family: inherit;
+    box-shadow: inset 0 -1px 5px 0 rgba(0,0,0,0.2);
+    outline: none;
+}
+
+.footer {
+    color: #777;
+    padding: 10px 16px;
+    border-top: 1px solid #e6e6e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.footer .todo-count strong { font-weight: 400; }
+
+.filters {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    gap: 4px;
+}
+.filters a {
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    color: inherit;
+    text-decoration: none;
+}
+.filters a.selected { border-color: rgba(175,47,47,0.2); }
+.filters a:hover { border-color: rgba(175,47,47,0.1); }
+
+.clear-completed {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
+    font-size: 13px;
+    padding: 0;
+}
+.clear-completed:hover { text-decoration: underline; }
