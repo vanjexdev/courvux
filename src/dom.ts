@@ -1120,11 +1120,27 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             const toExpr = element.getAttribute(':to');
             const toStatic = element.getAttribute('to');
             const getTo = () => toExpr ? String(evaluate(toExpr, state) ?? '/') : (toStatic || '/');
-            const a = document.createElement('a');
-            a.innerHTML = element.innerHTML;
+
+            // Build the inner <a> via innerHTML so the HTML parser accepts
+            // framework directive attributes whose names contain `@` / `:`
+            // (e.g. `@click`, `:aria-label`, `cv-show`). Stricter browsers
+            // — Safari, Samsung Internet — reject those names through the
+            // setAttribute() DOM API ("'@click' is not a valid attribute name"),
+            // even though the parser accepts them. Round-tripping through
+            // innerHTML uses the parser path. The walk below then processes
+            // the directives normally via a DocumentFragment wrapper.
+            const escAttr = (s: string) => String(s).replace(/[&"<>]/g, c =>
+                ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' }[c]!));
+            let attrsStr = '';
             Array.from(element.attributes).forEach(attr => {
-                if (attr.name !== 'to' && attr.name !== ':to') a.setAttribute(attr.name, attr.value);
+                if (attr.name === 'to' || attr.name === ':to') return;
+                attrsStr += ` ${attr.name}="${escAttr(attr.value)}"`;
             });
+            const tmpWrapper = document.createElement('div');
+            tmpWrapper.innerHTML = `<a${attrsStr}></a>`;
+            const a = tmpWrapper.firstElementChild as HTMLAnchorElement;
+            // Move original children into the new anchor.
+            while (element.firstChild) a.appendChild(element.firstChild);
             const routerBase = context.router?.base ?? '';
             const stripBaseLocal = (p: string): string => {
                 if (!routerBase) return p || '/';
@@ -1151,8 +1167,15 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             }
             if (toExpr) subscribeExpr(toExpr, context, updateActive);
             updateActive();
-            element.replaceWith(a);
-            await walk(a, state, context);
+
+            // Wrap in a DocumentFragment before walking so framework
+            // directives ON `a` itself (e.g. `@click`, `:aria-label`) get
+            // processed — walk() only visits CHILDREN of the passed node.
+            const linkFrag = document.createDocumentFragment();
+            linkFrag.appendChild(a);
+            await walk(linkFrag, state, context);
+            const renderedA = (linkFrag.firstChild ?? a) as HTMLElement;
+            element.replaceWith(renderedA);
             i++;
             continue;
         }
