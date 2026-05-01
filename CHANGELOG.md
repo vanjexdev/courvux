@@ -5,6 +5,27 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.4] — 2026-05-01
+
+### Bug fixes
+
+#### `<router-link>` crashes mount on Safari and Samsung Internet
+**File:** `src/dom.ts` — `router-link` directive
+Reported on iOS Safari and Samsung Internet (mobile): page renders blank with the unhandled rejection
+`Failed to execute 'setAttribute' on 'Element': '@click' is not a valid attribute name.`
+Cause: when the framework cloned `<router-link>` into the inner `<a>`, it forwarded **every** original attribute via `setAttribute(attr.name, attr.value)`. The HTML parser accepts framework directive names containing `@` and `:` (`@click`, `:aria-label`, etc.), but the `setAttribute()` DOM API in stricter browsers rejects them outright. Desktop Chrome / Firefox accepted these silently, so the bug went undetected.
+**Fix:**
+1. Build the inner `<a>` via `innerHTML` so the HTML parser handles framework attribute names (the parser-path is lenient).
+2. Wrap the new anchor in a `DocumentFragment` before walking so directives **on** the anchor itself (`@click`, `:aria-label`, `:aria-expanded`, `cv-show`, etc.) are processed by the directive handlers — `walk()` only visits children of the passed node.
+
+Affects every `<router-link>` that carries any framework directive — including the docs site sidebar where `@click="closeSidebar()"` was on every link.
+
+Also added in the docs site (`site/src/main.js`):
+- `<router-view />` → `<router-view></router-view>` (we documented self-closing custom elements as a no-go and were violating it ourselves).
+- `.mount('#app').catch(...)` — surfaces mount failures as an inline error card instead of a blank page, so the next mobile-only crash is diagnosable without remote debugging.
+
+---
+
 ## [0.4.3] — 2026-05-01
 
 ### Bug fixes

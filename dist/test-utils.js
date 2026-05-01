@@ -1148,11 +1148,16 @@ async function walk(el, state, context) {
       const toExpr = element.getAttribute(":to");
       const toStatic = element.getAttribute("to");
       const getTo = () => toExpr ? String(evaluate(toExpr, state) ?? "/") : toStatic || "/";
-      const a = document.createElement("a");
-      a.innerHTML = element.innerHTML;
+      const escAttr = (s) => String(s).replace(/[&"<>]/g, (c) => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" })[c]);
+      let attrsStr = "";
       Array.from(element.attributes).forEach((attr) => {
-        if (attr.name !== "to" && attr.name !== ":to") a.setAttribute(attr.name, attr.value);
+        if (attr.name === "to" || attr.name === ":to") return;
+        attrsStr += ` ${attr.name}="${escAttr(attr.value)}"`;
       });
+      const tmpWrapper = document.createElement("div");
+      tmpWrapper.innerHTML = `<a${attrsStr}></a>`;
+      const a = tmpWrapper.firstElementChild;
+      while (element.firstChild) a.appendChild(element.firstChild);
       const routerBase = context.router?.base ?? "";
       const stripBaseLocal = (p) => {
         if (!routerBase) return p || "/";
@@ -1185,8 +1190,11 @@ async function walk(el, state, context) {
       }
       if (toExpr) subscribeExpr(toExpr, context, updateActive);
       updateActive();
-      element.replaceWith(a);
-      await walk(a, state, context);
+      const linkFrag = document.createDocumentFragment();
+      linkFrag.appendChild(a);
+      await walk(linkFrag, state, context);
+      const renderedA = linkFrag.firstChild ?? a;
+      element.replaceWith(renderedA);
       i++;
       continue;
     }
