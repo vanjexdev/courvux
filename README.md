@@ -7,13 +7,13 @@
 </p>
 
 <p align="center">
-  <img alt="version"  src="https://img.shields.io/badge/version-0.4.0-blue">
+  <img alt="version"  src="https://img.shields.io/badge/version-0.4.1-blue">
   <img alt="size"     src="https://img.shields.io/badge/gzip-~10kB-brightgreen">
   <img alt="license"  src="https://img.shields.io/badge/license-MIT-lightgrey">
   <img alt="ts"       src="https://img.shields.io/badge/TypeScript-strict-3178c6">
 </p>
 
-**Author:** Vanjex — **Version:** 0.4.0
+**Author:** Vanjex — **Version:** 0.4.1
 
 ---
 
@@ -134,7 +134,7 @@ npm install github:vanjexdev/courvux
 Pin a tag for stable installs:
 
 ```bash
-pnpm add github:vanjexdev/courvux#v0.4.0
+pnpm add github:vanjexdev/courvux#v0.4.1
 ```
 
 **Without a bundler** — use an import map:
@@ -2592,7 +2592,7 @@ The dev server (`devserver.js`) serves:
 
 ## Top-level exports
 
-Everything exported from `'courvux'` (v0.4.0):
+Everything exported from `'courvux'` (v0.4.1):
 
 **App & lifecycle:**
 `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
@@ -2626,6 +2626,17 @@ Everything exported from `'courvux'` (v0.4.0):
 | `'courvux/test-utils'` | Vitest helpers (`mount`) |
 | `'courvux/plugin'` | Vite plugin for `templateUrl` inlining |
 | `'courvux/plugin/ssg'` | Vite plugin for static site generation |
+
+## Claude Code skill
+
+The repo ships a Claude Code skill at [`skills/courvux/SKILL.md`](./skills/courvux/SKILL.md). Drop it into `~/.claude/skills/courvux/` (or any agent that supports skill files) and your assistant gets a condensed reference to every public surface — directives, components, router, store, useHead, SSG plugin, composables, devtools, gotchas, and the project layout.
+
+```bash
+mkdir -p ~/.claude/skills/courvux
+cp skills/courvux/SKILL.md ~/.claude/skills/courvux/
+```
+
+The skill is kept in sync with the framework's public API on every release.
 
 ## Examples
 

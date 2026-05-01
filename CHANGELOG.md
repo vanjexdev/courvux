@@ -5,6 +5,22 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.1] — 2026-05-01
+
+### Documentation
+
+#### Claude Code skill bundled with the repo
+**File:** `skills/courvux/SKILL.md`
+The Claude Code / agent skill that ships condensed framework expertise (directives, components, router, store, useHead, SSG plugin, composables, devtools, common gotchas, project layout) is now versioned alongside the source. Drop into `~/.claude/skills/courvux/` to give a Claude Code or compatible-agent assistant up-to-date Courvux knowledge. Will be kept in sync on every release.
+
+#### Site install snippets refreshed
+**Files:** `site/src/pages/Installation.js`, `site/src/pages/Home.js`
+- jsDelivr importmap example pinned to `@v0.4.1` (was `@0.2.0`).
+- GitHub install snippets updated to demonstrate the recommended `#v<tag>` pin pattern alongside the rolling-`main` option.
+- "no npm publish yet" wording replaced with positive guidance to pin a tag.
+
+---
+
 ## [0.4.0] — 2026-05-01
 
 ### Bug fixes
