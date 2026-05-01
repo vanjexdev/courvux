@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-BaplDax2.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-3jZkDEi8.css">
+    <title>Progressive Web App — Courvux</title>
+    <meta name="description" content="Make any Courvux app installable and offline-capable: manifest, vite-plugin-pwa, install prompt utility.">
+    <meta property="og:title" content="Progressive Web App — Courvux">
+    <meta property="og:description" content="Make any Courvux app installable and offline-capable: manifest, vite-plugin-pwa, install prompt utility.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/pwa">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Progressive Web App — Courvux">
+    <meta name="twitter:description" content="Make any Courvux app installable and offline-capable: manifest, vite-plugin-pwa, install prompt utility.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/pwa">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>Progressive Web App (PWA)</h1>
+            <p>Courvux does not bundle PWA tooling — the manifest and service worker strategy are always app-specific. This page covers the minimal setup to make any Courvux app installable and offline-capable.</p>
+
+            <h2>Web App Manifest</h2>
+            <p>Create <code>public/manifest.json</code>:</p>
+            <code-block :lang="'json'" :code="s_manifest" lang="json"></code-block>
+
+            <p>Link it in <code>index.html</code>:</p>
+            <code-block :lang="'html'" :code="s_link" lang="html"></code-block>
+
+            <h2>Service Worker with Workbox</h2>
+            <p>Use <code>vite-plugin-pwa</code> to generate a service worker. Configure runtime caching strategies for your API endpoints.</p>
+            <code-block :lang="'js'" :code="s_workbox" lang="js"></code-block>
+
+            <h3>Cache strategies at a glance</h3>
+            <table>
+                <thead><tr><th>Strategy</th><th>Best for</th></tr></thead>
+                <tbody>
+                    <tr><td><code>CacheFirst</code></td><td>Static assets (fonts, images, icons)</td></tr>
+                    <tr><td><code>NetworkFirst</code></td><td>API calls — fresh when online, fallback when offline</td></tr>
+                    <tr><td><code>StaleWhileRevalidate</code></td><td>Non-critical data — instant from cache, updates in background</td></tr>
+                </tbody>
+            </table>
+
+            <h2>Install prompt utility</h2>
+            <p>The browser fires <code>beforeinstallprompt</code> when the app is installable, but only once. Capture it early — before any user interaction — and surface it at the right moment.</p>
+            <code-block :lang="'ts'" :code="s_pwa" lang="ts"></code-block>
+
+            <p>Use it in your app:</p>
+            <code-block :lang="'js'" :code="s_use" lang="js"></code-block>
+            <p>Then in any template:</p>
+            <code-block :lang="'html'" :code="s_template" lang="html"></code-block>
+
+            <div class="callout info">
+                <strong>Safari / iOS:</strong> The install prompt API is not supported. Users must add to home screen manually via the share button. Detect iOS with <code>navigator.userAgent.includes('iPhone')</code> and show a custom instruction.
+            </div>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/testing" class="">← Testing</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/advanced" class="">Advanced →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

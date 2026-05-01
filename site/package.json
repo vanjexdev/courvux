@@ -13,6 +13,7 @@
         "vite": "^6.3.0"
     },
     "dependencies": {
+        "courvux": "link:..",
         "lucide": "^0.511.0",
         "prismjs": "^1.30.0"
     }

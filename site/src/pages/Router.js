@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         s_setup: `import { createApp, createRouter } from 'courvux';
@@ -126,5 +128,12 @@ methods: {
                 <router-link to="/store" style="font-size:13px; color:#111; font-weight:600;">Store →</router-link>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Router',
+            description: 'SPA routing in Courvux: dynamic params, nested routes, navigation guards, transitions.',
+            slug: '/router',
+        });
+    },
 };

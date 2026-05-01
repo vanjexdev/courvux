@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-BaplDax2.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-3jZkDEi8.css">
+    <title>useHead — SEO and metadata — Courvux</title>
+    <meta name="description" content="Per-component head management with useHead in Courvux: title, meta tags, Open Graph, JSON-LD, htmlAttrs.">
+    <meta property="og:title" content="useHead — SEO and metadata — Courvux">
+    <meta property="og:description" content="Per-component head management with useHead in Courvux: title, meta tags, Open Graph, JSON-LD, htmlAttrs.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/head">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="useHead — SEO and metadata — Courvux">
+    <meta name="twitter:description" content="Per-component head management with useHead in Courvux: title, meta tags, Open Graph, JSON-LD, htmlAttrs.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/head">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>useHead — SEO and metadata</h1>
+            <p><code>useHead</code> is the per-component head management composable. It updates <code>document.title</code>, upserts <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> tags, and lets each route declare its own metadata. Tags are reverted on cleanup so navigating away from a route restores the previous head exactly.</p>
+
+            <h2>Basic usage</h2>
+            <code-block :lang="'js'" :code="s_basic" lang="js"></code-block>
+
+            <h2>Title templates</h2>
+            <code-block :lang="'js'" :code="s_title_tpl" lang="js"></code-block>
+
+            <h2>Config shape</h2>
+            <table>
+                <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+                <tbody>
+                    <tr><td><code>title</code></td><td>Replaces <code>document.title</code>. Restored on cleanup.</td></tr>
+                    <tr><td><code>titleTemplate</code></td><td>String with <code>%s</code> placeholder, or function form.</td></tr>
+                    <tr><td><code>meta</code></td><td>Each entry becomes a <code>&lt;meta&gt;</code> tag. Dedupe by <code>name</code>, then <code>property</code>, then <code>http-equiv</code>.</td></tr>
+                    <tr><td><code>link</code></td><td>Each entry becomes a <code>&lt;link&gt;</code> tag. <code>rel="canonical"</code> is unique. Other links dedupe by <code>rel + href</code>.</td></tr>
+                    <tr><td><code>script</code></td><td>Each entry becomes a <code>&lt;script&gt;</code> tag. Use <code>innerHTML</code> for inline content. Always inserted fresh.</td></tr>
+                    <tr><td><code>htmlAttrs</code></td><td>Sets attributes on <code>&lt;html&gt;</code> (e.g. <code>lang</code>, <code>class</code>). Restored on cleanup.</td></tr>
+                    <tr><td><code>bodyAttrs</code></td><td>Sets attributes on <code>&lt;body&gt;</code>. Restored on cleanup.</td></tr>
+                </tbody>
+            </table>
+
+            <h2>JSON-LD structured data</h2>
+            <p>Inject Schema.org structured data via the <code>script</code> field. Improves SERP appearance and Knowledge Graph eligibility.</p>
+            <code-block :lang="'js'" :code="s_jsonld" lang="js"></code-block>
+
+            <h2>html / body attrs</h2>
+            <code-block :lang="'js'" :code="s_html_attrs" lang="js"></code-block>
+
+            <h2>SSR safety</h2>
+            <p><code>useHead</code> is a no-op when <code>document</code> is unavailable, so it's safe to call during SSR. During <a href="/courvux/ssg/" class="link">static generation</a>, calls are buffered and inlined into the emitted page's <code>&lt;head&gt;</code> automatically.</p>
+
+            <div class="callout info">
+                Pair <code>useHead</code> with <code>mode: 'history'</code> in the router so each route has a real URL the crawler can fetch. Hash routing (<code>#/path</code>) prevents servers and crawlers from seeing per-route content.
+            </div>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/store" class="">← Store</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/ssg" class="">Static Generation →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

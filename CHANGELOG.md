@@ -27,6 +27,24 @@ Vite plugin that pre-renders Courvux routes to static HTML at build time. Each r
 - `renderHeadToString(head) → string` — renders a `HeadConfig` to HTML for embedding in a page shell.
 - Both await async `onMount` so users can dynamic-import inside it.
 
+#### Router `base` option for subpath deployments
+**File:** `src/router.ts`, `src/dom.ts`, `src/types.ts`
+`createRouter(routes, { mode: 'history', base: '/myapp' })` — internal route paths stay clean (`/about`); the router prepends `base` when writing to history and strips it when reading `window.location`. `<router-link>` `href` is also rendered with the base prefix so server-rendered HTML and progressive enhancement work without JS. Required for SSG deployments under a subpath (e.g. GitHub Pages at `/<repo>/`).
+
+### Changes
+
+#### Head collection state moved to `globalThis`
+**File:** `src/head.ts`
+The SSG/SSR head buffer is now stored at `globalThis.__COURVUX_HEAD_COLLECTOR__`. Without this, when `useHead` is imported from a different module-cache slot (e.g. through a pnpm symlink) than the one used by `renderPage`, calls would land in a separate buffer and be silently dropped. Behavior in regular client runtime is unchanged.
+
+#### SSG plugin shell auto-detection
+**File:** `plugin/vite-plugin-courvux-ssg.js`
+By default, the plugin now reads the Vite-emitted `<outDir>/index.html` and uses it as the page shell — preserving hashed asset paths automatically. It strips per-page-overridable head tags (`<title>`, `<meta name="description">`, `<meta property="og:*">`, `<link rel="canonical">`) so the SSG-injected metadata does not duplicate the shell's. An explicit `template` option still overrides this behavior.
+
+#### SSG plugin `notFound` option for `404.html`
+**File:** `plugin/vite-plugin-courvux-ssg.js`
+New plugin option: `notFound: ComponentConfig | () => Promise<{default: ComponentConfig}>`. When provided, the plugin renders this component the same way as a regular route and writes the result to `<outDir>/404.html`. Static hosts (GitHub Pages, Netlify, Cloudflare Pages) serve this file for any unknown path, allowing the SPA to hydrate over a real 404 view instead of falling back to the host's generic page.
+
 ---
 
 ## [0.3.0] — 2026-04-29

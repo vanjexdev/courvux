@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 const STORAGE_KEY = 'courvux-demo-todos';
 
 const SRC_JS = `const STORAGE_KEY = 'courvux-demo-todos';
@@ -301,5 +303,12 @@ export default {
                 </div>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Demo — TODO App',
+            description: 'Interactive TODO app built with Courvux. Live demo with full source code (JS + HTML).',
+            slug: '/demo',
+        });
+    },
 };

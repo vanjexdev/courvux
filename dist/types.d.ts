@@ -69,6 +69,14 @@ export type ScrollBehavior = (to: RouteMatch, from: RouteMatch | null) => {
 export interface Router {
     routes: RouteConfig[];
     mode: 'hash' | 'history';
+    /**
+     * Base URL prefix for `mode: 'history'` deployments under a subpath
+     * (e.g. GitHub Pages at `/<repo>/`). Internal route paths are kept clean
+     * (`/about`); the router prepends `base` when writing to history and
+     * strips it when reading `window.location`.
+     * Trailing slash is normalized; defaults to `''` (no prefix).
+     */
+    base?: string;
     transition?: string;
     beforeEach?: NavigationGuard;
     afterEach?: (to: RouteMatch, from: RouteMatch | null) => void;

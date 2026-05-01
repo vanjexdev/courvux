@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
   data: {
     s1: `npm install github:vanjexdev/courvux
@@ -47,9 +49,14 @@ export default defineConfig({
 <\/script>`,
   },
   onMount() {
+    setHead({
+        title: 'Installation',
+        description: 'Install Courvux via npm, GitHub, or import map. Vite plugin for templateUrl inlining and CDN setup with jsDelivr.',
+        slug: '/installation',
+    });
+
     const placeholder = this.$refs.pen;
     if (!placeholder) return;
-    console.log(placeholder);
     const iframe = document.createElement('iframe');
     iframe.src = 'https://codepen.io/jesusuzcategui-the-bold/embed/VYmZNgZ?default-tab=html%2Cresult&theme-id=dark';
     iframe.height = '420';
@@ -106,5 +113,5 @@ export default defineConfig({
                 <router-link to="/quick-start" style="font-size:13px; color:#111; font-weight:600;">Quick Start →</router-link>
             </div>
         </div>
-    `
+    `,
 };

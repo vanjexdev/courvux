@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-BaplDax2.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-3jZkDEi8.css">
+    <title>Reactivity — Courvux</title>
+    <meta name="description" content="Proxy-based reactive state, computed properties, watchers, and refs in Courvux.">
+    <meta property="og:title" content="Reactivity — Courvux">
+    <meta property="og:description" content="Proxy-based reactive state, computed properties, watchers, and refs in Courvux.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/reactivity">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Reactivity — Courvux">
+    <meta name="twitter:description" content="Proxy-based reactive state, computed properties, watchers, and refs in Courvux.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/reactivity">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>Reactivity</h1>
+            <p>Courvux uses Proxy-based reactivity. Every key in <code>data</code> is observable — reading it creates a subscription, writing it notifies subscribers.</p>
+
+            <h2>Computed properties</h2>
+            <p>Automatically recalculate when their dependencies change. Dependencies are detected by parsing <code>this.key</code> references in the getter source.</p>
+            <code-block :lang="'js'" :code="s_computed" lang="js"></code-block>
+
+            <h3>Computed setter</h3>
+            <code-block :lang="'js'" :code="s_computed_set" lang="js"></code-block>
+
+            <h2>Watchers</h2>
+            <p>React to state changes. Receives <code>(newVal, oldVal)</code> with <code>this</code> bound to component state.</p>
+            <code-block :lang="'js'" :code="s_watch" lang="js"></code-block>
+
+            <h3>Programmatic watcher — $watch</h3>
+            <code-block :lang="'js'" :code="s_watch_prog" lang="js"></code-block>
+
+            <h2>$batch — group mutations</h2>
+            <p>Multiple state changes inside <code>$batch</code> trigger only one DOM update cycle.</p>
+            <code-block :lang="'js'" :code="s_batch" lang="js"></code-block>
+
+            <h2>$nextTick — after DOM update</h2>
+            <p>Runs a callback after the next reactive flush. Also returns a <code>Promise</code>.</p>
+            <code-block :lang="'js'" :code="s_nexttick" lang="js"></code-block>
+
+            <h2>$watchEffect — auto-tracked effect</h2>
+            <p>Runs immediately and re-runs when any reactive key accessed inside it changes. Stopped automatically on component destroy.</p>
+            <code-block :lang="'js'" :code="s_watcheffect" lang="js"></code-block>
+
+            <h2>Escape hatches</h2>
+            <p>Three helpers let you opt out of reactivity selectively:</p>
+            <code-block :lang="'js'" :code="s_escape" lang="js"></code-block>
+
+            <table>
+                <thead><tr><th>Helper</th><th>Use case</th></tr></thead>
+                <tbody>
+                    <tr><td><code>markRaw(obj)</code></td><td>Skip Proxy wrapping (third-party class instances like Chart.js or xterm.js controllers)</td></tr>
+                    <tr><td><code>toRaw(reactive)</code></td><td>Get the underlying non-Proxy object (serialization, <code>JSON.stringify</code>, deep equality)</td></tr>
+                    <tr><td><code>readonly(obj)</code></td><td>Wrap so writes are silently ignored (use for <code>provide</code> values that shouldn't mutate downstream)</td></tr>
+                </tbody>
+            </table>
+
+            <h3>markRaw</h3>
+            <code-block :lang="'js'" :code="s_markraw" lang="js"></code-block>
+
+            <h3>toRaw</h3>
+            <code-block :lang="'js'" :code="s_toraw" lang="js"></code-block>
+
+            <h3>readonly</h3>
+            <code-block :lang="'js'" :code="s_readonly" lang="js"></code-block>
+
+            <div class="callout info">
+                Native built-ins like <code>Date</code>, <code>Map</code>, <code>Set</code>, <code>RegExp</code>, and typed arrays are automatically skipped from Proxy wrapping — you don't need <code>markRaw</code> for them.
+            </div>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/components" class="">← Components</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/lifecycle" class="">Lifecycle →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

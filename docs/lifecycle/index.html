@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-BaplDax2.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-3jZkDEi8.css">
+    <title>Lifecycle Hooks — Courvux</title>
+    <meta name="description" content="onMount, onBeforeUnmount, onDestroy, error boundaries, and async data in Courvux.">
+    <meta property="og:title" content="Lifecycle Hooks — Courvux">
+    <meta property="og:description" content="onMount, onBeforeUnmount, onDestroy, error boundaries, and async data in Courvux.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/lifecycle">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Lifecycle Hooks — Courvux">
+    <meta name="twitter:description" content="onMount, onBeforeUnmount, onDestroy, error boundaries, and async data in Courvux.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/lifecycle">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>Lifecycle Hooks</h1>
+            <p>All hooks have <code>this</code> bound to the reactive component state.</p>
+
+            <table>
+                <tbody><tr><th>Hook</th><th>When it fires</th></tr>
+                <tr><td><code>onBeforeMount</code></td><td>Before the DOM walk begins — <code>$el</code> not yet set</td></tr>
+                <tr><td><code>onMount</code></td><td>After mounting — DOM ready, <code>$el</code> and <code>$refs</code> available</td></tr>
+                <tr><td><code>onBeforeUnmount</code></td><td>Before destroy — cleanup event listeners, timers here</td></tr>
+                <tr><td><code>onDestroy</code></td><td>After the component is destroyed</td></tr>
+                <tr><td><code>onActivated</code></td><td>When a <code>keepAlive</code> component is restored from cache</td></tr>
+                <tr><td><code>onDeactivated</code></td><td>When a <code>keepAlive</code> component is stored in cache</td></tr>
+                <tr><td><code>onError</code></td><td>Catches errors thrown by descendant <code>onMount</code> hooks</td></tr>
+            </tbody></table>
+
+            <h2>Example — timer with cleanup</h2>
+            <code-block :lang="'js'" :code="s1" lang="js"></code-block>
+
+            <h2>keepAlive hooks</h2>
+            <p>Set <code>keepAlive: true</code> on a route to cache the component's DOM and state between navigations.</p>
+            <code-block :lang="'js'" :code="s2" lang="js"></code-block>
+
+            <h2>Error boundary — onError</h2>
+            <p>An <code>onError</code> hook catches errors thrown by any descendant component's <code>onMount</code>. The error does not propagate further.</p>
+            <code-block :lang="'js'" :code="s3" lang="js"></code-block>
+
+            <div class="callout">
+                On the root <code>createApp</code> config, <code>onMount</code> fires after the first route is fully rendered — safe for third-party DOM libraries.
+            </div>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/reactivity" class="">← Reactivity</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/router" class="">Router →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

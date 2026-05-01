@@ -1,3 +1,5 @@
+import { setHead } from '../seo.js';
+
 export default {
     data: {
         s1: `{
@@ -83,5 +85,12 @@ export default {
                 <router-link to="/router" style="font-size:13px; color:#111; font-weight:600;">Router →</router-link>
             </div>
         </div>
-    `
+    `,
+    onMount() {
+        setHead({
+            title: 'Lifecycle Hooks',
+            description: 'onMount, onBeforeUnmount, onDestroy, error boundaries, and async data in Courvux.',
+            slug: '/lifecycle',
+        });
+    },
 };
