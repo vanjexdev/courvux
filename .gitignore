@@ -5,3 +5,7 @@ app-ssr/
 coverage/
 examples/*/dist/
 examples/*/node_modules/
+site/.env
+site/.env.*
+agent_instructions.md
+readme-need-updates.md
