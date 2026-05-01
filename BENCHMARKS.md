@@ -4,7 +4,7 @@ Honest, reproducible numbers. Where we cite competitor sizes we link the source.
 
 ## Bundle size — measured
 
-Courvux ships a single ES module. Measured against `dist/index.js` from `0.3.0`:
+Courvux ships a single ES module. Measured against `dist/index.js` from `0.4.0`:
 
 | Metric | Value |
 |---|---|
@@ -24,7 +24,7 @@ brotli -c dist/index.js | wc -c    # brotli bytes (if installed)
 
 | Framework | Min + gzip | Source |
 |---|---|---|
-| **Courvux 0.3.0** | **~20.7 KB** | This repo, measured above |
+| **Courvux 0.4.0** | **~20.7 KB** | This repo, measured above |
 | Alpine.js 3.x | ~14 KB | [bundlephobia](https://bundlephobia.com/package/alpinejs) |
 | Petite-Vue 0.4.x | ~6 KB | [bundlephobia](https://bundlephobia.com/package/petite-vue) |
 | Preact 10.x (core) | ~4 KB | [bundlephobia](https://bundlephobia.com/package/preact) |

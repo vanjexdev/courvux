@@ -7,13 +7,13 @@
 </p>
 
 <p align="center">
-  <img alt="version"  src="https://img.shields.io/badge/version-0.3.0-blue">
+  <img alt="version"  src="https://img.shields.io/badge/version-0.4.0-blue">
   <img alt="size"     src="https://img.shields.io/badge/gzip-~10kB-brightgreen">
   <img alt="license"  src="https://img.shields.io/badge/license-MIT-lightgrey">
   <img alt="ts"       src="https://img.shields.io/badge/TypeScript-strict-3178c6">
 </p>
 
-**Author:** Vanjex — **Version:** 0.3.0
+**Author:** Vanjex — **Version:** 0.4.0
 
 ---
 
@@ -123,20 +123,18 @@
 
 ## Installation
 
-### From npm (when published)
-
-```bash
-pnpm add courvux
-# or
-npm install courvux
-```
-
-### From GitHub (current — until Courvux hits npm)
+### From GitHub
 
 ```bash
 pnpm add github:vanjexdev/courvux
 # or
 npm install github:vanjexdev/courvux
+```
+
+Pin a tag for stable installs:
+
+```bash
+pnpm add github:vanjexdev/courvux#v0.4.0
 ```
 
 **Without a bundler** — use an import map:
@@ -2594,7 +2592,7 @@ The dev server (`devserver.js`) serves:
 
 ## Top-level exports
 
-Everything exported from `'courvux'` (v0.3.0):
+Everything exported from `'courvux'` (v0.4.0):
 
 **App & lifecycle:**
 `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
