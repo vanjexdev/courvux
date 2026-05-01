@@ -142,7 +142,7 @@ createApp({
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:1rem;">
                     <span style="font-size:2rem;">⚡</span>
                     <h1 style="font-size:2rem; font-weight:700; margin:0;">Courvux</h1>
-                    <span class="badge">v0.3.0</span>
+                    <span class="badge">v0.4.0</span>
                 </div>
                 <p style="font-size:1rem; color:#444; margin-bottom:1.5rem; max-width:560px; line-height:1.6;">
                     Lightweight reactive UI framework. No virtual DOM —
@@ -2178,7 +2178,7 @@ export default {
                     <router-link to="/" style="text-decoration:none; display:flex; align-items:center; gap:8px;">
                         <span style="font-size:1.3rem;">⚡</span>
                         <span style="font-weight:700; font-size:15px; color:#111;">Courvux</span>
-                        <span style="font-size:10px; color:#999; margin-left:2px;">v0.3.0</span>
+                        <span style="font-size:10px; color:#999; margin-left:2px;">v0.4.0</span>
                     </router-link>
                 </div>
 

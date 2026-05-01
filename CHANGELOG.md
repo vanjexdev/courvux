@@ -5,7 +5,7 @@ Format: `[version] — date — description`
 
 ---
 
-## [Unreleased]
+## [0.4.0] — 2026-05-01
 
 ### Bug fixes
 
