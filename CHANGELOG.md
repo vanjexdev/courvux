@@ -7,6 +7,13 @@ Format: `[version] — date — description`
 
 ## [Unreleased]
 
+### Bug fixes
+
+#### `cv-if` / `cv-show` / interpolation never re-evaluate when their expression accesses a nested property (e.g. `items.length`)
+**File:** `src/dom.ts` — `subscribeDeps`
+The dep extractor matched the entire dotted path (`items.length`) as a single token and subscribed to that exact string. But the reactivity scope only notifies on the top-level state key — assigning a new array to `state.items` notifies `'items'`, never `'items.length'`. Subscribers registered on the dotted path therefore never fired, so any `cv-if`, `cv-show`, `cv-class`, interpolation, or `:attr` whose expression touched a nested property (`array.length`, `obj.someProp`, `user.name`, etc.) silently failed to react after the initial render.
+**Fix:** reduce each token to its root segment before subscribing, except for `$store.<path>` which is handled per-leaf by `subscribeExpr`. Existing tests didn't catch this because they used bare-key expressions (`show`, `count`); a regression test for `items.length > 0` was added.
+
 ### Features
 
 #### `useHead` composable for per-component head management

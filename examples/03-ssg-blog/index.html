@@ -5,10 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Blog</title>
     <meta name="description" content="A small static blog generated with Courvux." />
-    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="./src/style.css" />
+
+    <!-- Importmap so the source files resolve `import ... from 'courvux'`
+         under a plain static server (no Vite required). Vite's dev/build
+         pipeline replaces these imports through its own resolver, so this
+         block is harmless during `pnpm dev` / `pnpm build`. -->
+    <script type="importmap">
+    {
+      "imports": {
+        "courvux": "../../dist/index.js"
+      }
+    }
+    </script>
 </head>
 <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="./src/main.js"></script>
 </body>
 </html>
