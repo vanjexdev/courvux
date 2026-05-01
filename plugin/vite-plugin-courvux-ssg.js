@@ -68,6 +68,7 @@ export default function courvuxSsg(options = {}) {
         skipDuringDev = true,
         notFound,
         router,
+        components,
     } = options;
 
     if (typeof routes !== 'function') {
@@ -137,6 +138,15 @@ export default function courvuxSsg(options = {}) {
             // Lazy-import courvux SSR (peer of the user project)
             const { renderPage, renderHeadToString } = await import('../dist/index.js');
 
+            // Resolve global components map (the same one passed to createApp).
+            // Accepts an object or an async function returning the map.
+            let resolvedComponents = {};
+            if (typeof components === 'function') {
+                resolvedComponents = (await components()) ?? {};
+            } else if (components && typeof components === 'object') {
+                resolvedComponents = components;
+            }
+
             const emitted = [];
 
             for (const route of routeList) {
@@ -176,6 +186,7 @@ export default function courvuxSsg(options = {}) {
                             renderPage,
                             renderHeadToString,
                             router,
+                            components: resolvedComponents,
                         });
                         emitted.push(targetPath);
                         console.log(`[courvux-ssg] ✓ ${targetPath}`);
@@ -205,6 +216,7 @@ export default function courvuxSsg(options = {}) {
                         outDir: resolvedOutDir,
                         renderPage,
                         renderHeadToString,
+                        components: resolvedComponents,
                     });
                     console.log(`[courvux-ssg] ✓ 404.html`);
                 } catch (err) {
@@ -227,12 +239,13 @@ async function emitRoute({
     renderPage,
     renderHeadToString,
     router,
+    components,
 }) {
     const resolvedComponent = typeof component === 'function'
         ? (await component()).default ?? (await component())
         : component;
 
-    const result = await renderPage(resolvedComponent, { router });
+    const result = await renderPage(resolvedComponent, { router, components });
 
     // If the component did not declare any head via useHead and a fallback
     // is provided at the route level, use it.
@@ -260,12 +273,12 @@ async function emitRoute({
     await fs.writeFile(path.join(fileDir, 'index.html'), finalHtml, 'utf-8');
 }
 
-async function emit404({ component, template, mountId, outDir, renderPage, renderHeadToString }) {
+async function emit404({ component, template, mountId, outDir, renderPage, renderHeadToString, components }) {
     const resolved = typeof component === 'function'
         ? (await component()).default ?? (await component())
         : component;
 
-    const result = await renderPage(resolved);
+    const result = await renderPage(resolved, { components });
     const headHtml = renderHeadToString(result.head);
     const finalHtml = template
         .replaceAll('%head%', headHtml)

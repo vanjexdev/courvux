@@ -16,8 +16,8 @@
  */
 
 import type { ComponentConfig } from './types.js';
-import { walk } from './dom.js';
-import { createReactivityScope } from './reactivity.js';
+import { walk, evaluate } from './dom.js';
+import { createReactivityScope, toRaw } from './reactivity.js';
 import {
     _startHeadCollection,
     _stopHeadCollection,
@@ -33,6 +33,113 @@ async function runWalkSSR(el: Element, state: any, extraContext: Record<string, 
     const { subscribe } = createReactivityScope();
     const context = { subscribe, refs: {}, ...extraContext };
     await walk(el as any, state, context as any);
+}
+
+/**
+ * Slimmed-down `mountElement` for SSG. Resolves `:prop` bindings from parent
+ * state, builds child state, runs `onBeforeMount` / `onMount` so `useHead`
+ * and ref-using setup (e.g. Prism syntax highlight in CodeBlock) execute,
+ * walks the child template with the same SSG context (so nested custom
+ * components are also rendered), and replaces the original element with the
+ * rendered output.
+ *
+ * Differences vs the runtime `createMountElement`:
+ *  - No reactivity subscriptions / prop bindings / emit handlers / cv-model
+ *    wiring (one-shot render — no events fire post-render).
+ *  - Slot support is default-slot only (named/scoped slots are skipped for
+ *    now; client hydration restores them).
+ *  - `$emit` is a no-op.
+ */
+async function ssgMountElement(
+    el: HTMLElement,
+    tagName: string,
+    parentState: any,
+    parentContext: any,
+    components: Record<string, ComponentConfig>
+): Promise<void> {
+    const componentConfig = components[tagName];
+    if (!componentConfig) return;
+
+    // Resolve props from `:prop="expr"` and gather $attrs (non-framework attrs).
+    const props: Record<string, any> = {};
+    const $attrs: Record<string, string> = {};
+    Array.from(el.attributes).forEach(attr => {
+        if (attr.name.startsWith(':')) {
+            const propName = attr.name.slice(1);
+            try { props[propName] = toRaw(evaluate(attr.value, parentState)); }
+            catch { /* skip props that fail to evaluate */ }
+        } else if (
+            !attr.name.startsWith('@') &&
+            !attr.name.startsWith('cv:on:') &&
+            !attr.name.startsWith('cv-model') &&
+            !attr.name.startsWith('v-slot') &&
+            attr.name !== 'slot'
+        ) {
+            $attrs[attr.name] = attr.value;
+        }
+    });
+
+    // Capture default-slot children (anything without `slot` attr).
+    const defaultSlotNodes: Node[] = [];
+    Array.from(el.childNodes).forEach(n => {
+        if (n.nodeType === 1 && (n as HTMLElement).getAttribute('slot')) return;
+        defaultSlotNodes.push(n.cloneNode(true));
+    });
+
+    // Build a child state with props merged and a no-op $emit.
+    const data = typeof componentConfig.data === 'function'
+        ? await (componentConfig.data as any)()
+        : (componentConfig.data ?? {});
+    const childRaw: Record<string, any> = {
+        ...data,
+        ...(componentConfig.methods ?? {}),
+        ...props,
+        $attrs,
+        $refs: {} as Record<string, any>,
+        $emit: () => {},
+    };
+    const childState = new Proxy(childRaw, {
+        get: (t, k: string) => t[k],
+        set: (t, k: string, v) => { t[k] = v; return true; },
+    });
+    if (componentConfig.computed) {
+        for (const [k, def] of Object.entries(componentConfig.computed)) {
+            const getter = typeof def === 'function' ? def : def.get;
+            try { (childState as any)[k] = getter.call(childState); } catch { /* */ }
+        }
+    }
+
+    // Render template into a wrapper, then walk recursively with SSG context.
+    const template = componentConfig.template ?? '';
+    if (!template) return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = template;
+
+    // Resolve <slot> placeholders to the captured default-slot nodes.
+    const slots = wrapper.querySelectorAll('slot:not([name])');
+    slots.forEach(slot => {
+        const frag = document.createDocumentFragment();
+        defaultSlotNodes.forEach(n => frag.appendChild(n.cloneNode(true)));
+        slot.replaceWith(frag);
+    });
+
+    // Walk children with the same SSG context so nested custom components,
+    // router-link, useHead, etc. all keep working.
+    const ssgCtx = {
+        ...parentContext,
+        refs: childRaw.$refs,
+        // Propagate nested components map and the same ssgMountElement so
+        // child→grandchild custom components also render.
+    };
+
+    try { await componentConfig.onBeforeMount?.call(childState); } catch { /* */ }
+    await walk(wrapper as any, childState, ssgCtx as any);
+    try { await componentConfig.onMount?.call(childState); } catch { /* */ }
+
+    // Replace original element with rendered output (preserve as a fragment).
+    const out = document.createDocumentFragment();
+    while (wrapper.firstChild) out.appendChild(wrapper.firstChild);
+    el.replaceWith(out);
 }
 
 function buildState(config: ComponentConfig): any {
@@ -115,7 +222,11 @@ export interface RenderedPage {
  */
 export async function renderPage(
     config: ComponentConfig,
-    options: { data?: Record<string, any>; router?: { mode?: 'hash' | 'history'; base?: string } } = {}
+    options: {
+        data?: Record<string, any>;
+        router?: { mode?: 'hash' | 'history'; base?: string };
+        components?: Record<string, ComponentConfig>;
+    } = {}
 ): Promise<RenderedPage> {
     _startHeadCollection();
     let html = '';
@@ -141,6 +252,23 @@ export async function renderPage(
                 mode: options.router.mode ?? 'history',
                 base: options.router.base ?? '',
             };
+        }
+
+        // Custom-component support during SSG: register components and a
+        // mountElement that produces static HTML. Without these the walk()
+        // leaves <my-comp> tags unrendered in the output (crawler-invisible).
+        const allComponents: Record<string, ComponentConfig> = {
+            ...(config.components ?? {}),
+            ...(options.components ?? {}),
+        };
+        if (Object.keys(allComponents).length > 0) {
+            extraCtx.components = allComponents;
+            extraCtx.mountElement = (
+                el: HTMLElement,
+                tagName: string,
+                pState: any,
+                pContext: any
+            ) => ssgMountElement(el, tagName, pState, pContext, allComponents);
         }
 
         try { await config.onBeforeMount?.call(state); } catch { /* */ }

@@ -342,6 +342,15 @@ export default defineConfig({
             // Optional — emits dist/404.html for static-host fallback
             notFound: async () => (await import('./src/pages/NotFound.js')).default,
 
+            // Optional — same global components passed to createApp().
+            // Required for custom components (<code-block>, <my-card>, etc.)
+            // to render into static HTML during SSG instead of staying as
+            // unprocessed tags. Default-slot content is rendered; named/
+            // scoped slots are skipped at build time and hydrate on client.
+            components: async () => ({
+                'code-block': (await import('./src/components/CodeBlock.js')).CodeBlock,
+            }),
+
             // Optional — custom shell. Default: auto-reads Vite-emitted index.html
             // template: '<!doctype html>...%head%...%app%...',
             // mountId: 'app',
