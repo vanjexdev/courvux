@@ -104,6 +104,7 @@
   - [Defining plugins with `createPlugin`](#defining-plugins-with-createplugin)
 - [Composables](#composables)
 - [SEO and `useHead`](#seo-and-usehead)
+- [Static Site Generation (SSG)](#static-site-generation-ssg)
 - [Event Bus](#event-bus)
 - [Reactivity escape hatches](#reactivity-escape-hatches)
 - [DevTools](#devtools)
@@ -2108,6 +2109,102 @@ useHead({
 
 ---
 
+## Static Site Generation (SSG)
+
+Courvux ships a Vite plugin that pre-renders every route to its own `index.html` at build time. Crawlers, Open Graph previewers, and static hosts (GitHub Pages, Netlify, Cloudflare Pages) see real per-route HTML — not an empty SPA shell.
+
+The plugin captures `useHead` calls during render, so each emitted page has its correct `<title>`, meta tags, canonical link, and JSON-LD inlined into `<head>`. A `sitemap.xml` and `robots.txt` are emitted alongside.
+
+### Usage
+
+```js
+// vite.config.js
+import { defineConfig } from 'vite';
+import courvuxSsg from 'courvux/plugin/ssg';
+
+export default defineConfig({
+    plugins: [
+        courvuxSsg({
+            // Required — async function returning the route list.
+            // Each entry: { path, component, head?, prerender? }
+            routes: async () => (await import('./src/routes.js')).default,
+
+            // Site base URL — required for sitemap.xml + robots.txt
+            baseUrl: 'https://courvux.dev',
+
+            // Optional — page shell with %head%, %app%, %mountId% placeholders.
+            // Defaults to a minimal HTML5 shell.
+            // template: '<!doctype html>...',
+
+            // Optional — id of the mount root in the shell. Default: 'app'.
+            // mountId: 'app',
+
+            // Optional — also emit sitemap.xml + robots.txt. Default: true.
+            // sitemap: true,
+        }),
+    ],
+});
+```
+
+### Per-route options
+
+```js
+const routes = [
+    {
+        path: '/',
+        component: HomePage,
+        // Optional fallback head if the component does not call useHead
+        head: { title: 'Home — Courvux' }
+    },
+    {
+        path: '/installation',
+        component: InstallationPage,  // calls useHead({ title, meta, ... }) in onMount
+    },
+    {
+        // Dynamic route: the plugin calls prerender() to learn which paths to emit
+        path: '/blog/:slug',
+        component: BlogPost,
+        prerender: async () => {
+            const posts = await fetch('https://api.example.com/posts').then(r => r.json());
+            return posts.map(p => `/blog/${p.slug}`);
+        },
+    },
+];
+```
+
+### Output structure
+
+```
+dist/
+├── index.html                  ← /
+├── installation/index.html     ← /installation
+├── blog/
+│   ├── intro/index.html        ← /blog/intro (from prerender)
+│   └── faq/index.html          ← /blog/faq
+├── sitemap.xml
+└── robots.txt
+```
+
+### How head capture works
+
+During SSG, `useHead` calls are buffered instead of mutating the document. The plugin merges them per route, applies dedupe rules (same as runtime), and inlines them into the `<head>` of the emitted HTML. If a component does not call `useHead`, the route-level `head` field is used as a fallback.
+
+`onMount` is invoked during SSG so the standard `useHead` pattern works as-is. Errors thrown from `onMount` (e.g. for client-only APIs like `IntersectionObserver`) are caught and logged — guard SSR-incompatible code with `typeof window === 'undefined'`.
+
+### Programmatic API
+
+If you don't use Vite, the same primitives are exported:
+
+```js
+import { renderPage, renderHeadToString } from 'courvux';
+
+const { html, head } = await renderPage(componentConfig);
+const headHtml = renderHeadToString(head);
+// → embed `headHtml` in your shell, then `html` in the mount root
+```
+
+---
+
 ## Event Bus
 
 For cross-component signals that don't belong in the store (analytics events, IPC bridges, plugin hooks), Courvux exports a typed event bus:
@@ -2517,8 +2614,8 @@ Everything exported from `'courvux'` (v0.3.0):
 **DevTools:**
 `setupDevTools`, `mountDevOverlay`
 
-**SSR:**
-`renderToString`, `SSR_ATTR`
+**SSR / SSG:**
+`renderToString`, `renderPage`, `renderHeadToString`, `SSR_ATTR`
 
 **SEO:**
 `useHead`
@@ -2530,6 +2627,7 @@ Everything exported from `'courvux'` (v0.3.0):
 | `'courvux'` | Main runtime |
 | `'courvux/test-utils'` | Vitest helpers (`mount`) |
 | `'courvux/plugin'` | Vite plugin for `templateUrl` inlining |
+| `'courvux/plugin/ssg'` | Vite plugin for static site generation |
 
 **Type exports** (`import type`):
-`AppConfig`, `ComponentConfig`, `RouteConfig`, `Router`, `RouteMatch`, `RouteActivation`, `NavigationGuard`, `ScrollBehavior`, `WatcherEntry`, `WatcherOptions`, `DirectiveBinding`, `DirectiveDef`, `DirectiveShorthand`, `LazyComponent`, `ComputedDef`, `EventBus`, `FetchState`, `FetchOptions`, `DevToolsHook`, `DevToolsComponentInstance`, `DevToolsStoreEntry`, `StoreConfig`, `HeadConfig`, `HeadMeta`, `HeadLink`, `HeadScript`
+`AppConfig`, `ComponentConfig`, `RouteConfig`, `Router`, `RouteMatch`, `RouteActivation`, `NavigationGuard`, `ScrollBehavior`, `WatcherEntry`, `WatcherOptions`, `DirectiveBinding`, `DirectiveDef`, `DirectiveShorthand`, `LazyComponent`, `ComputedDef`, `EventBus`, `FetchState`, `FetchOptions`, `DevToolsHook`, `DevToolsComponentInstance`, `DevToolsStoreEntry`, `StoreConfig`, `HeadConfig`, `HeadMeta`, `HeadLink`, `HeadScript`, `RenderedPage`

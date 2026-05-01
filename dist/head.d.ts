@@ -28,4 +28,8 @@ export interface HeadConfig {
     htmlAttrs?: Record<string, string>;
     bodyAttrs?: Record<string, string>;
 }
+/** @internal — used by `renderPage` in src/ssr.ts to capture head calls during SSG. */
+export declare function _startHeadCollection(): void;
+/** @internal — called by `renderPage` to retrieve and reset the collected head. */
+export declare function _stopHeadCollection(): HeadConfig[];
 export declare function useHead(config: HeadConfig): () => void;

@@ -13,6 +13,20 @@ Format: `[version] — date — description`
 **File:** `src/head.ts`
 Per-route SEO metadata: `title`, `titleTemplate`, `meta`, `link`, `script`, `htmlAttrs`, `bodyAttrs`. Returns a cleanup function that reverts every tag it touched (existing tags' previous attrs are captured and restored). Dedupe rules: meta by `name`/`property`/`http-equiv`; link by `rel="canonical"` or `rel+href`. SSR-safe (no-op when `document` is unavailable). See README "SEO and `useHead`".
 
+#### Static Site Generation plugin (`courvux/plugin/ssg`)
+**Files:** `plugin/vite-plugin-courvux-ssg.js`, `src/ssr.ts`, `src/head.ts`
+Vite plugin that pre-renders Courvux routes to static HTML at build time. Each route emits its own `<path>/index.html` so crawlers and static hosts see real per-route HTML, not an empty SPA shell.
+- `useHead` calls during render are buffered (not applied to `document`) and inlined into the emitted page's `<head>` after dedupe.
+- Dynamic routes with `:param` opt in via a `prerender()` callback returning the concrete paths.
+- Emits `sitemap.xml` and `robots.txt` from the route list when `baseUrl` is provided.
+- Customizable shell template with `%head%`, `%app%`, `%mountId%` placeholders.
+
+#### `renderPage` and `renderHeadToString` (low-level SSG primitives)
+**File:** `src/ssr.ts`
+- `renderPage(config, opts) → { html, head }` — runs `onBeforeMount` and `onMount` (errors caught) and captures `useHead` calls during render.
+- `renderHeadToString(head) → string` — renders a `HeadConfig` to HTML for embedding in a page shell.
+- Both await async `onMount` so users can dynamic-import inside it.
+
 ---
 
 ## [0.3.0] — 2026-04-29
