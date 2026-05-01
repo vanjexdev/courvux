@@ -14,8 +14,15 @@ import TemplateSyntax from './pages/TemplateSyntax.js';
 import Components     from './pages/Components.js';
 import Reactivity     from './pages/Reactivity.js';
 import Lifecycle      from './pages/Lifecycle.js';
+import Composables    from './pages/Composables.js';
+import EventBus       from './pages/EventBus.js';
 import RouterPage     from './pages/Router.js';
 import Store          from './pages/Store.js';
+import Head           from './pages/Head.js';
+import Ssg            from './pages/Ssg.js';
+import DevTools       from './pages/DevTools.js';
+import Testing        from './pages/Testing.js';
+import Pwa            from './pages/Pwa.js';
 import Advanced       from './pages/Advanced.js';
 import DemoTodo       from './pages/DemoTodo.js';
 
@@ -27,8 +34,15 @@ export default [
     { path: '/components',   component: Components },
     { path: '/reactivity',   component: Reactivity },
     { path: '/lifecycle',    component: Lifecycle },
+    { path: '/composables',  component: Composables },
+    { path: '/event-bus',    component: EventBus },
     { path: '/router',       component: RouterPage },
     { path: '/store',        component: Store },
+    { path: '/head',         component: Head },
+    { path: '/ssg',          component: Ssg },
+    { path: '/devtools',     component: DevTools },
+    { path: '/testing',      component: Testing },
+    { path: '/pwa',          component: Pwa },
     { path: '/advanced',     component: Advanced },
     { path: '/demo',         component: DemoTodo },
 ];

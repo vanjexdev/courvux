@@ -7,8 +7,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
-  <script type="module" crossorigin src="/courvux/assets/index-DaPEsSBI.js"></script>
-  <link rel="stylesheet" crossorigin href="/courvux/assets/index-C22xiKCb.css">
+  <script type="module" crossorigin src="/courvux/assets/index-BjDWjfCN.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-3jZkDEi8.css">
     <title>Reactivity — Courvux</title>
     <meta name="description" content="Proxy-based reactive state, computed properties, watchers, and refs in Courvux.">
     <meta property="og:title" content="Reactivity — Courvux">
@@ -52,6 +52,32 @@
             <h2>$watchEffect — auto-tracked effect</h2>
             <p>Runs immediately and re-runs when any reactive key accessed inside it changes. Stopped automatically on component destroy.</p>
             <code-block :lang="'js'" :code="s_watcheffect" lang="js"></code-block>
+
+            <h2>Escape hatches</h2>
+            <p>Three helpers let you opt out of reactivity selectively:</p>
+            <code-block :lang="'js'" :code="s_escape" lang="js"></code-block>
+
+            <table>
+                <thead><tr><th>Helper</th><th>Use case</th></tr></thead>
+                <tbody>
+                    <tr><td><code>markRaw(obj)</code></td><td>Skip Proxy wrapping (third-party class instances like Chart.js or xterm.js controllers)</td></tr>
+                    <tr><td><code>toRaw(reactive)</code></td><td>Get the underlying non-Proxy object (serialization, <code>JSON.stringify</code>, deep equality)</td></tr>
+                    <tr><td><code>readonly(obj)</code></td><td>Wrap so writes are silently ignored (use for <code>provide</code> values that shouldn't mutate downstream)</td></tr>
+                </tbody>
+            </table>
+
+            <h3>markRaw</h3>
+            <code-block :lang="'js'" :code="s_markraw" lang="js"></code-block>
+
+            <h3>toRaw</h3>
+            <code-block :lang="'js'" :code="s_toraw" lang="js"></code-block>
+
+            <h3>readonly</h3>
+            <code-block :lang="'js'" :code="s_readonly" lang="js"></code-block>
+
+            <div class="callout info">
+                Native built-ins like <code>Date</code>, <code>Map</code>, <code>Set</code>, <code>RegExp</code>, and typed arrays are automatically skipped from Proxy wrapping — you don't need <code>markRaw</code> for them.
+            </div>
 
             <div style="margin-top:2rem; display:flex; gap:12px;">
                 <a style="font-size:13px; color:#555;" href="#/components" class="">← Components</a>

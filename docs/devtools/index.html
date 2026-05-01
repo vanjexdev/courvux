@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>⚡</text></svg>" />
+  <script type="module" crossorigin src="/courvux/assets/index-BjDWjfCN.js"></script>
+  <link rel="stylesheet" crossorigin href="/courvux/assets/index-3jZkDEi8.css">
+    <title>DevTools — Courvux</title>
+    <meta name="description" content="In-app DevTools overlay for Courvux: live component state inspection and inline editing, no browser extension needed.">
+    <meta property="og:title" content="DevTools — Courvux">
+    <meta property="og:description" content="In-app DevTools overlay for Courvux: live component state inspection and inline editing, no browser extension needed.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://vanjexdev.github.io/courvux/devtools">
+    <meta property="og:site_name" content="Courvux">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="DevTools — Courvux">
+    <meta name="twitter:description" content="In-app DevTools overlay for Courvux: live component state inspection and inline editing, no browser extension needed.">
+    <link rel="canonical" href="https://vanjexdev.github.io/courvux/devtools">
+</head>
+<body>
+    <div id="app">
+        <div class="prose" data-courvux-ssr="true">
+            <h1>DevTools</h1>
+            <p>Courvux ships an in-app DevTools panel — no browser extension required. It mounts a draggable badge in the corner of the page that opens a panel showing all mounted components, their reactive state, and the global store, with <strong>inline live editing</strong>: click any value to edit it, press Enter to commit.</p>
+
+            <h2>Setup</h2>
+            <code-block :lang="'js'" :code="s_setup" lang="js"></code-block>
+
+            <h2>What it shows</h2>
+            <table>
+                <thead><tr><th>Tab</th><th>Content</th></tr></thead>
+                <tbody>
+                    <tr><td>Components</td><td>Tree of all mounted components with their reactive state. Click a key to edit its value live.</td></tr>
+                    <tr><td>Store</td><td>Global store snapshot. Modules nested. Same inline editing as Components.</td></tr>
+                    <tr><td>Events</td><td>Recent <code>$emit</code> / <code>$dispatch</code> activity for tracing communication between components.</td></tr>
+                </tbody>
+            </table>
+
+            <h2>External integration</h2>
+            <p>The hook is exposed at <code>window.__COURVUX_DEVTOOLS__</code> for use by external tooling — a Chrome extension is on the roadmap.</p>
+            <code-block :lang="'js'" :code="s_external" lang="js"></code-block>
+
+            <h2>Hook API</h2>
+            <code-block :lang="'ts'" :code="s_hook" lang="ts"></code-block>
+
+            <div class="callout info">
+                Wrap the setup in <code>import.meta.env.DEV</code> (Vite) or equivalent to keep the overlay out of production bundles. The runtime cost in dev is small — observers attach lazily per component.
+            </div>
+
+            <div style="margin-top:2rem; display:flex; gap:12px;">
+                <a style="font-size:13px; color:#555;" href="#/ssg" class="">← Static Generation</a>
+                <a style="font-size:13px; color:#111; font-weight:600;" href="#/testing" class="">Testing →</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

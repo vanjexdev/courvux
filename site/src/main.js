@@ -9,47 +9,66 @@ const NAV = [
         key: 'start',
         label: 'Getting Started',
         items: [
-            { to: '/', label: 'Introduction' },
+            { to: '/',             label: 'Introduction' },
             { to: '/installation', label: 'Installation' },
-            { to: '/quick-start', label: 'Quick Start' },
+            { to: '/quick-start',  label: 'Quick Start' },
         ]
     },
     {
         key: 'template',
         label: 'Template Syntax',
         items: [
-            { to: '/template', label: 'Directives & Bindings' },
+            { to: '/template',     label: 'Directives & Bindings' },
         ]
     },
     {
         key: 'components',
         label: 'Components',
         items: [
-            { to: '/components', label: 'Components' },
-            { to: '/reactivity', label: 'Reactivity' },
-            { to: '/lifecycle', label: 'Lifecycle' },
+            { to: '/components',   label: 'Components' },
+            { to: '/reactivity',   label: 'Reactivity' },
+            { to: '/lifecycle',    label: 'Lifecycle' },
+            { to: '/composables',  label: 'Composables' },
+            { to: '/event-bus',    label: 'Event Bus' },
         ]
     },
     {
         key: 'router',
         label: 'Router & Store',
         items: [
-            { to: '/router', label: 'Router' },
-            { to: '/store', label: 'Store' },
+            { to: '/router',       label: 'Router' },
+            { to: '/store',        label: 'Store' },
+        ]
+    },
+    {
+        key: 'seo',
+        label: 'SEO & SSG',
+        items: [
+            { to: '/head',         label: 'useHead' },
+            { to: '/ssg',          label: 'Static Generation' },
+        ]
+    },
+    {
+        key: 'tooling',
+        label: 'Tooling',
+        items: [
+            { to: '/devtools',     label: 'DevTools' },
+            { to: '/testing',      label: 'Testing' },
+            { to: '/pwa',          label: 'PWA' },
         ]
     },
     {
         key: 'advanced',
         label: 'Advanced',
         items: [
-            { to: '/advanced', label: 'Directives & Plugins' },
+            { to: '/advanced',     label: 'Directives & Plugins' },
         ]
     },
     {
         key: 'demo',
         label: 'Demo',
         items: [
-            { to: '/demo', label: '⚡ TODO App' },
+            { to: '/demo',         label: '⚡ TODO App' },
         ]
     },
 ];

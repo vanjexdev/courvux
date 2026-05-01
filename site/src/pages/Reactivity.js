@@ -88,6 +88,29 @@ batchUpdate(() => {
     });
     // Stopped automatically on component destroy
 }`,
+
+        s_escape: `import { markRaw, toRaw, readonly } from 'courvux';`,
+
+        s_markraw: `// Skip Proxy wrapping for third-party class instances whose internal
+// slots break under Proxy (Chart.js, xterm.js, Map, Set, etc.)
+{
+    data: {
+        chart: markRaw(new Chart(canvas, opts)),  // not made reactive
+    }
+}`,
+
+        s_toraw: `// Get the underlying non-Proxy object — useful for serialization,
+// JSON.stringify, deep equality, or passing to non-reactive APIs.
+const snapshot = toRaw(this.user);
+console.log(JSON.stringify(snapshot));`,
+
+        s_readonly: `// Wrap so writes are silently ignored (with a warning).
+// Use for provide values that descendants must not mutate.
+provide() {
+    return {
+        config: readonly(this.appConfig),
+    };
+}`,
     },
     template: `
         <div class="prose">
@@ -119,6 +142,32 @@ batchUpdate(() => {
             <h2>$watchEffect — auto-tracked effect</h2>
             <p>Runs immediately and re-runs when any reactive key accessed inside it changes. Stopped automatically on component destroy.</p>
             <code-block :lang="'js'" :code="s_watcheffect"></code-block>
+
+            <h2>Escape hatches</h2>
+            <p>Three helpers let you opt out of reactivity selectively:</p>
+            <code-block :lang="'js'" :code="s_escape"></code-block>
+
+            <table>
+                <thead><tr><th>Helper</th><th>Use case</th></tr></thead>
+                <tbody>
+                    <tr><td><code>markRaw(obj)</code></td><td>Skip Proxy wrapping (third-party class instances like Chart.js or xterm.js controllers)</td></tr>
+                    <tr><td><code>toRaw(reactive)</code></td><td>Get the underlying non-Proxy object (serialization, <code>JSON.stringify</code>, deep equality)</td></tr>
+                    <tr><td><code>readonly(obj)</code></td><td>Wrap so writes are silently ignored (use for <code>provide</code> values that shouldn't mutate downstream)</td></tr>
+                </tbody>
+            </table>
+
+            <h3>markRaw</h3>
+            <code-block :lang="'js'" :code="s_markraw"></code-block>
+
+            <h3>toRaw</h3>
+            <code-block :lang="'js'" :code="s_toraw"></code-block>
+
+            <h3>readonly</h3>
+            <code-block :lang="'js'" :code="s_readonly"></code-block>
+
+            <div class="callout info">
+                Native built-ins like <code>Date</code>, <code>Map</code>, <code>Set</code>, <code>RegExp</code>, and typed arrays are automatically skipped from Proxy wrapping — you don't need <code>markRaw</code> for them.
+            </div>
 
             <div style="margin-top:2rem; display:flex; gap:12px;">
                 <router-link to="/components" style="font-size:13px; color:#555;">← Components</router-link>
