@@ -2,9 +2,11 @@ import { setHead } from '../seo.js';
 
 export default {
   data: {
-    s1: `npm install github:vanjexdev/courvux
-# or
-pnpm add github:vanjexdev/courvux`,
+    s1: `# Latest commit on main (rolling)
+pnpm add github:vanjexdev/courvux
+
+# Pin to a tagged release (recommended for production)
+pnpm add github:vanjexdev/courvux#v0.4.0`,
     s2: `<script type="importmap">
 {
   "imports": {
@@ -39,7 +41,7 @@ export default defineConfig({
 <script type="importmap">
 {
   "imports": {
-    "courvux": "https://cdn.jsdelivr.net/gh/vanjexdev/courvux@0.2.0/dist/index.js"
+    "courvux": "https://cdn.jsdelivr.net/gh/vanjexdev/courvux@v0.4.0/dist/index.js"
   }
 }
 <\/script>
@@ -51,7 +53,7 @@ export default defineConfig({
   onMount() {
     setHead({
         title: 'Installation',
-        description: 'Install Courvux via npm, GitHub, or import map. Vite plugin for templateUrl inlining and CDN setup with jsDelivr.',
+        description: 'Install Courvux from GitHub or via import map / CDN. Vite plugin for templateUrl inlining and jsDelivr CDN setup.',
         slug: '/installation',
     });
 
@@ -86,7 +88,7 @@ export default defineConfig({
             <p cv-ref="pen" style="margin:0 0 1rem; color:#888; font-size:12px;">Loading pen…</p>
 
             <h2>From GitHub</h2>
-            <p>Install directly from the GitHub repository (no npm publish yet):</p>
+            <p>Install directly from the GitHub repository — pin a tag for stable installs:</p>
             <code-block :lang="'bash'" :code="s1" :label="'terminal'"></code-block>
 
             <h2>Without a bundler — Import Map</h2>

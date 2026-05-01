@@ -2,10 +2,10 @@ import { setHead } from '../seo.js';
 
 export default {
     data: {
-        install: `# From GitHub
-npm install github:vanjexdev/courvux
+        install: `# From GitHub — pin a tag for stable installs
+pnpm add github:vanjexdev/courvux#v0.4.0
 
-# or via pnpm
+# or rolling main
 pnpm add github:vanjexdev/courvux`,
         counter: `import { createApp } from 'courvux';
 
