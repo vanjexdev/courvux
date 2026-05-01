@@ -55,10 +55,10 @@ body {
     padding: 7px 14px;
     border-bottom: 1px solid #2d2d2d;
 }
-.code-lang { font-size: 11px; color: #666; letter-spacing: 0.05em; font-weight: 500; }
+.code-lang { font-size: 11px; color: #999; letter-spacing: 0.05em; font-weight: 500; }
 .copy-btn {
     font-size: 11px;
-    color: #666;
+    color: #999;
     background: none;
     border: 1px solid #333;
     border-radius: 4px;
@@ -110,3 +110,91 @@ body {
 .filter-btn { padding: 4px 12px; border-radius: 4px; font-size: 12px; border: 1px solid transparent; cursor: pointer; font-family: inherit; background: transparent; color: #555; }
 .filter-btn:hover { border-color: #ccc; }
 .filter-btn.active { border-color: #111; color: #111; font-weight: 600; }
+
+/* ── Responsive: tablet & mobile ────────────────────────────────── */
+@media (max-width: 1024px) {
+    /* Hide sidebar off-screen by default */
+    .sidebar {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        height: 100vh !important;
+        transform: translateX(-100%);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+    }
+    .sidebar.sidebar-open,
+    .sidebar[style*="transform: translateX(0%)"] {
+        transform: translateX(0);
+    }
+
+    /* Show floating toggle button */
+    .sidebar-toggle {
+        display: flex !important;
+    }
+
+    /* Main content full width */
+    main > div {
+        padding: 1.5rem 1rem 3rem !important;
+    }
+
+    /* Prose adjustments for smaller screens */
+    .prose h1 { font-size: 1.35rem; }
+    .prose h2 { font-size: 1.05rem; margin-top: 2rem; }
+    .prose table { font-size: 0.75rem; }
+    .prose table { display: block; overflow-x: auto; white-space: nowrap; }
+
+    /* Code blocks: smaller padding */
+    .code-block pre[class*="language-"] {
+        padding: 0.9rem 1rem !important;
+        font-size: 12px !important;
+    }
+}
+
+/* ── Sidebar open state (managed via JS class toggle) ──────────── */
+@media (max-width: 1024px) {
+    .sidebar-mobile-open {
+        transform: translateX(0) !important;
+    }
+}
+
+/* ── Overlay visibility ────────────────────────────────────────── */
+@media (min-width: 1025px) {
+    .sidebar-overlay {
+        display: none !important;
+    }
+}
+
+/* ── Focus visible for keyboard accessibility ──────────────────── */
+*:focus-visible {
+    outline: 2px solid #111;
+    outline-offset: 2px;
+}
+
+a:focus-visible,
+button:focus-visible {
+    outline: 2px solid #111;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.nav-link:focus-visible {
+    outline-offset: -2px;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ── High contrast mode support ────────────────────────────────── */
+@media (prefers-contrast: more) {
+    .nav-link { border: 1px solid transparent; }
+    .nav-link:hover, .nav-link.active { border-color: #111; }
+    .prose a { text-decoration-thickness: 2px; }
+    .code-block { border-width: 2px; }
+}
