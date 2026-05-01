@@ -131,7 +131,7 @@ pnpm add courvux
 npm install courvux
 ```
 
-### From GitHub (current — until 0.3.0 hits npm)
+### From GitHub (current — until Courvux hits npm)
 
 ```bash
 pnpm add github:vanjexdev/courvux
@@ -2588,7 +2588,7 @@ The dev server (`devserver.js`) serves:
 | `cv-for` without `:key` | Without a `:key`, any change to a tracked array/object destroys and recreates all list nodes. Use `:key="item.id"` to enable keyed reconciliation — only changed/added/removed nodes are touched. |
 | `cv-for` array mutation | Courvux detects array reassignment (`items = newArray`) and does a full keyed diff. Direct array mutations like `items.push(x)` or `items[0].name = 'x'` also trigger reactively via the deep Proxy, but the diff still runs over the full list. Intercepting specific mutations (push/splice) for O(1) DOM ops is not yet implemented. |
 | Self-closing custom elements | `<my-comp />` is **not** valid for custom elements — HTML5 parser ignores the trailing `/`, leaving the element open and swallowing its siblings. Always use explicit closing tags: `<my-comp></my-comp>`. |
-| SSR scope | Basic SSR + hydration is supported via `renderToString`. Not yet optimized for high-throughput SSR servers. SSG (route pre-rendering) is on the roadmap. |
+| SSR scope | Basic SSR + hydration is supported via `renderToString`, and route pre-rendering is shipped via `courvux/plugin/ssg`. Neither is yet optimized for high-throughput SSR servers — the use case targeted today is SSG / static export, not per-request server rendering. |
 
 ---
 
