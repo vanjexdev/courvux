@@ -110,6 +110,29 @@ export default defineConfig({
                 To update, remove and re-add the package.
             </div>
 
+            <h2>Browser support</h2>
+            <p>Courvux targets <strong>the last two major versions</strong> of each modern browser. Older versions may work but are not validated.</p>
+            <table>
+                <thead>
+                    <tr><th>Browser</th><th>Minimum version</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Chrome</td><td>90+</td><td>✅</td></tr>
+                    <tr><td>Edge</td><td>90+</td><td>✅</td></tr>
+                    <tr><td>Firefox</td><td>88+</td><td>✅</td></tr>
+                    <tr><td>Safari (macOS / iOS)</td><td>15+</td><td>✅ (verified since 0.4.4 on iOS Safari)</td></tr>
+                    <tr><td>Samsung Internet</td><td>18+</td><td>✅ (verified since 0.4.4)</td></tr>
+                    <tr><td>iOS WebView</td><td>iOS 15+</td><td>✅</td></tr>
+                    <tr><td>Android WebView</td><td>Chrome 90+</td><td>✅</td></tr>
+                </tbody>
+            </table>
+            <p style="font-size:13px; color:#555;">
+                Every release runs unit tests + SSR / SSG self-tests + a Playwright E2E suite on Chromium and Firefox. WebKit-class browsers (Safari, Samsung Internet, iOS WebView) are validated on real devices for each release. CI integration is on the roadmap.
+            </p>
+            <p style="font-size:13px; color:#555;">
+                Hit a bug on a supported browser? <a href="https://github.com/vanjexdev/courvux/issues" target="_blank" rel="noopener">Open an issue</a> — same first-priority class as the 0.4.4 / 0.4.5 / 0.4.6 patches.
+            </p>
+
             <div style="margin-top:2rem; display:flex; gap:12px;">
                 <router-link to="/" style="font-size:13px; color:#555;">← Home</router-link>
                 <router-link to="/quick-start" style="font-size:13px; color:#111; font-weight:600;">Quick Start →</router-link>
