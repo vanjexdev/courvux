@@ -321,7 +321,20 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
             if (!config) return;
 
             const newEl = document.createElement('div');
-            Array.from(originalEl.attributes).forEach(a => newEl.setAttribute(a.name, a.value));
+            // Forward non-framework attributes to the wrapper. Framework
+            // directive names (`@event`, `:prop`, `cv-*`, `v-slot`) are
+            // either consumed by the prop/emit extraction below OR not
+            // valid HTML attribute names through the setAttribute() DOM API
+            // in stricter browsers (Safari, Samsung Internet) — copying
+            // them here would throw `InvalidCharacterError` and abort the
+            // dynamic mount, same class of bug as router-link in 0.4.4.
+            const isFrameworkAttr = (name: string): boolean =>
+                name.startsWith('@') || name.startsWith('cv:on:') ||
+                name.startsWith(':') || name.startsWith('cv-') ||
+                name.startsWith('v-slot');
+            Array.from(originalEl.attributes).forEach(a => {
+                if (!isFrameworkAttr(a.name)) newEl.setAttribute(a.name, a.value);
+            });
             newEl.innerHTML = originalEl.innerHTML;
 
             const props: Record<string, any> = {};

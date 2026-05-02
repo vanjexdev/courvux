@@ -1327,9 +1327,19 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                     } else if (k === 'style') {
                         applyStyle(element, val, staticStyle);
                     } else if (val === null || val === undefined || val === false) {
-                        element.removeAttribute(k);
+                        try { element.removeAttribute(k); } catch { /* invalid name */ }
                     } else {
-                        element.setAttribute(k, val === true ? '' : String(val));
+                        // Defensive try/catch: stricter browsers (Safari,
+                        // Samsung Internet) reject attribute names containing
+                        // chars like `@` or `:` through the setAttribute()
+                        // DOM API. cv-bind takes a free-form object so users
+                        // could pass unusual keys; warn instead of crashing
+                        // the whole walk.
+                        try {
+                            element.setAttribute(k, val === true ? '' : String(val));
+                        } catch (err) {
+                            console.warn(`[courvux] cv-bind: skipping invalid attribute name "${k}":`, err);
+                        }
                     }
                 }
                 prevKeys = newKeys;
