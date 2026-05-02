@@ -1333,9 +1333,16 @@ async function walk(el, state, context) {
           } else if (k === "style") {
             applyStyle(element, val, staticStyle);
           } else if (val === null || val === void 0 || val === false) {
-            element.removeAttribute(k);
+            try {
+              element.removeAttribute(k);
+            } catch {
+            }
           } else {
-            element.setAttribute(k, val === true ? "" : String(val));
+            try {
+              element.setAttribute(k, val === true ? "" : String(val));
+            } catch (err) {
+              console.warn(`[courvux] cv-bind: skipping invalid attribute name "${k}":`, err);
+            }
           }
         }
         prevKeys = newKeys;
@@ -2305,7 +2312,10 @@ async function mount(el, config, appContext) {
       }
       if (!config2) return;
       const newEl = document.createElement("div");
-      Array.from(originalEl.attributes).forEach((a) => newEl.setAttribute(a.name, a.value));
+      const isFrameworkAttr = (name) => name.startsWith("@") || name.startsWith("cv:on:") || name.startsWith(":") || name.startsWith("cv-") || name.startsWith("v-slot");
+      Array.from(originalEl.attributes).forEach((a) => {
+        if (!isFrameworkAttr(a.name)) newEl.setAttribute(a.name, a.value);
+      });
       newEl.innerHTML = originalEl.innerHTML;
       const props = {};
       const emitHandlers = {};
