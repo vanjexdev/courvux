@@ -34,8 +34,29 @@
 
 ---
 
+## Browser support
+
+Courvux targets **the last two major versions** of each modern browser. The framework is tested against the table below; older versions may work but are not validated.
+
+| Browser              | Minimum version | Status |
+|----------------------|-----------------|--------|
+| Chrome               | 90+             | ✅ |
+| Edge                 | 90+             | ✅ |
+| Firefox              | 88+             | ✅ |
+| Safari (macOS / iOS) | 15+             | ✅ (verified since 0.4.4 on iOS Safari) |
+| Samsung Internet     | 18+             | ✅ (verified since 0.4.4) |
+| iOS WebView          | iOS 15+         | ✅ |
+| Android WebView      | Chrome 90+      | ✅ |
+
+**What "supported" means:** every release runs unit tests + SSR / SSG self-tests + a Playwright E2E suite on Chromium and Firefox. WebKit-class browsers (Safari, Samsung Internet, iOS WebView) are validated on real devices for each release plus by the WebKit project in Playwright (CI integration is roadmap Fase 5.2).
+
+If you hit a bug on a supported browser, [open an issue](https://github.com/vanjexdev/courvux/issues) — these are first-priority fixes, same class as the 0.4.4 / 0.4.5 / 0.4.6 patches.
+
+---
+
 ## Table of Contents
 
+- [Browser support](#browser-support)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [createApp](#createapp)
