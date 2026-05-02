@@ -61,6 +61,16 @@ const NAV = [
     items: [{ to: "/advanced", label: "Directives & Plugins" }],
   },
   {
+    key: "reference",
+    label: "Reference",
+    items: [
+      { to: "/design-decisions",      label: "Design Decisions" },
+      { to: "/faq",                   label: "FAQ & Troubleshooting" },
+      { to: "/migrating-from-vue",    label: "Migrating from Vue" },
+      { to: "/migrating-from-alpine", label: "Migrating from Alpine" },
+    ],
+  },
+  {
     key: "demo",
     label: "Demo",
     items: [{ to: "/demo", label: "⚡ TODO App" }],

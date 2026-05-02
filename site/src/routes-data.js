@@ -24,6 +24,10 @@ import DevTools       from './pages/DevTools.js';
 import Testing        from './pages/Testing.js';
 import Pwa            from './pages/Pwa.js';
 import Advanced       from './pages/Advanced.js';
+import DesignDecisions from './pages/DesignDecisions.js';
+import Faq             from './pages/Faq.js';
+import MigratingFromVue    from './pages/MigratingFromVue.js';
+import MigratingFromAlpine from './pages/MigratingFromAlpine.js';
 import DemoTodo       from './pages/DemoTodo.js';
 
 export default [
@@ -44,5 +48,9 @@ export default [
     { path: '/testing',      component: Testing },
     { path: '/pwa',          component: Pwa },
     { path: '/advanced',     component: Advanced },
+    { path: '/design-decisions',     component: DesignDecisions },
+    { path: '/faq',                  component: Faq },
+    { path: '/migrating-from-vue',   component: MigratingFromVue },
+    { path: '/migrating-from-alpine', component: MigratingFromAlpine },
     { path: '/demo',         component: DemoTodo },
 ];

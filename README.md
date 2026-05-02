@@ -34,6 +34,32 @@
 
 ---
 
+## Why Courvux?
+
+**1. Everything you need in one bundle, none of the wiring.**
+Router, store, devtools, `useHead`, composables, SSR primitives — all in 20 KB gzip. With Alpine you'd add 4–5 third-party libraries; with Vue 3 + vue-router + pinia + devtools-package you're around 60–80 KB. Courvux ships the same surface area at a third of the cost, fully integrated (the store knows about the router, devtools knows about both).
+
+**2. No build step required to evaluate it.**
+Courvux is a single ES module. Drop a `<script type="importmap">` and a `<script type="module">` into any HTML file and you're done — no Webpack, no Vite, no `npm install`. When you outgrow the importmap pattern, the same code works under Vite without touching imports. See [Installation](#installation).
+
+**3. Built-in DevTools, no browser extension.**
+A draggable overlay with live state inspection and inline editing ships with the framework. Your reviewer / colleague / future-self gets the debugger without installing anything per-browser. See [DevTools](#devtools).
+
+**4. SEO-correct by default.**
+`useHead` + `courvux/plugin/ssg` pre-render every route to its own `<path>/index.html` at build time. Crawlers and Open Graph previewers see real per-route HTML, not an empty SPA shell. The docs site you're reading uses this — every page has its own title, meta, canonical, and JSON-LD inlined statically. See [Static Site Generation](#static-site-generation-ssg).
+
+---
+
+## Try it in 30 seconds
+
+The fastest way to feel the framework is to open the live demo and the importmap example side-by-side:
+
+- **Live TodoMVC demo:** [vanjexdev.github.io/courvux/demo](https://vanjexdev.github.io/courvux/demo/) — `cv-for`, `cv-model`, computed, deep `watch`, dynamic `:cv-ref`, all in one file.
+- **No-build example:** [`examples/01-todomvc/`](./examples/01-todomvc/) — clone the repo and `npx serve .` from the root, then open `/examples/01-todomvc/`. The example uses an importmap pointing at the local `dist/`, no bundler required.
+- **SSG example with router + `useHead`:** [`examples/03-ssg-blog/`](./examples/03-ssg-blog/) — `pnpm install && pnpm build && pnpm preview` shows what production-deployed HTML looks like.
+
+---
+
 ## Browser support
 
 Courvux targets **the last two major versions** of each modern browser. The framework is tested against the table below; older versions may work but are not validated.
@@ -56,6 +82,8 @@ If you hit a bug on a supported browser, [open an issue](https://github.com/vanj
 
 ## Table of Contents
 
+- [Why Courvux?](#why-courvux)
+- [Try it in 30 seconds](#try-it-in-30-seconds)
 - [Browser support](#browser-support)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -137,6 +165,8 @@ If you hit a bug on a supported browser, [open an issue](https://github.com/vanj
   - [PWA install prompt utility](#pwa-install-prompt-utility)
 - [Building](#building)
 - [Development](#development)
+- [Production readiness](#production-readiness)
+- [Who's using Courvux](#whos-using-courvux)
 - [Known Limitations](#known-limitations)
 - [Top-level exports](#top-level-exports)
 
@@ -2596,6 +2626,35 @@ The dev server (`devserver.js`) serves:
 - `/dist/` — built framework files
 - `/node_modules/` — npm packages (for import maps)
 - `app/` — demo application (SPA fallback for history mode)
+
+---
+
+## Production readiness
+
+Courvux is **pre-1.0** and not yet on npm — install via the GitHub URL with a tag pin (see [Installation](#installation)). Honest assessment of what's safe to ship today vs what isn't:
+
+**Use it for**
+- Marketing sites and docs (this site is built with it).
+- Internal tools / dashboards / admin panels — anywhere the audience and the team are bounded.
+- Mobile/desktop apps via Tauri / Electron / Capacitor — the small bundle is a real win in those shells.
+- Side projects, prototypes, MVPs.
+- Static sites that need real per-route HTML (SSG).
+
+**Hold off if**
+- Your project requires strict CSP that disallows `new Function` — the expression evaluator falls back to a property-access-only mode, which loses inline JS expressions inside templates.
+- You need a battle-tested ecosystem of third-party plugins / UI kits — Courvux is small enough that the ecosystem is still you.
+- The framework choice is a contractual / regulatory blocker — pre-1.0 software, even when stable, may not meet that bar.
+
+**What we measure for "stable"**
+Every release runs unit tests + SSR / SSG self-tests + Playwright E2E on Chromium and Firefox + a real-device manual smoke on Safari iOS and Samsung Internet (see [`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md)). Bugs that affect supported browsers are first-priority fixes (the 0.4.4 / 0.4.5 / 0.4.6 patches are how this works in practice).
+
+---
+
+## Who's using Courvux
+
+If you're shipping something with Courvux, [open a PR](https://github.com/vanjexdev/courvux/pulls) adding it here — keeps the section honest and helps other evaluators see it's not just a toy.
+
+- **[Courvux docs site](https://vanjexdev.github.io/courvux/)** — the site you're reading. Built with `courvux/plugin/ssg`, deployed to GitHub Pages.
 
 ---
 
