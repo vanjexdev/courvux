@@ -11,3 +11,6 @@ agent_instructions.md
 readme-need-updates.md
 FORCED_REFLOW_FIX.md
 courvux-new-roadmap.md
+playwright-report/
+test-results/
+.playwright/
