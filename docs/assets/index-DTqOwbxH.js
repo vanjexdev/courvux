@@ -123,7 +123,7 @@ router-view.slide-up-enter{animation:cv-slide-up-in 0.25s forwards}
             <pre class="language-placeholder"><code cv-ref="el" :class="'language-' + lang"></code></pre>
         </div>
     `,computed:{langLabel(){return Xt[this.lang]||this.lang.toUpperCase()}},methods:{copy(){var e;(e=navigator.clipboard)==null||e.writeText(this._cleanCode).then(()=>{this.copied=!0,setTimeout(()=>{this.copied=!1},1800)})}},onMount(){const e=this.$refs.el;e&&(this._cleanCode=Zt(this.code),e.textContent=this._cleanCode,Gt.highlightElement(e))}},he="Courvux",Kt="https://vanjexdev.github.io/courvux";function Z({title:e,description:t,slug:o="/"}){const i=e?`${e} — ${he}`:`${he} — Lightweight reactive UI framework`,s=Kt+o;return Nt({title:e??`${he} — Lightweight reactive UI framework`,titleTemplate:e?`%s — ${he}`:void 0,meta:[{name:"description",content:t},{property:"og:title",content:i},{property:"og:description",content:t},{property:"og:type",content:"website"},{property:"og:url",content:s},{property:"og:site_name",content:he},{name:"twitter:card",content:"summary_large_image"},{name:"twitter:title",content:i},{name:"twitter:description",content:t}],link:[{rel:"canonical",href:s}]})}const Qt={data:{install:`# From GitHub — pin a tag for stable installs
-pnpm add github:vanjexdev/courvux#v0.4.5
+pnpm add github:vanjexdev/courvux#v0.4.6
 
 # or rolling main
 pnpm add github:vanjexdev/courvux`,counter:`import { createApp } from 'courvux';
@@ -142,7 +142,7 @@ createApp({
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:1rem;">
                     <span style="font-size:2rem;">⚡</span>
                     <h1 style="font-size:2rem; font-weight:700; margin:0;">Courvux</h1>
-                    <span class="badge">v0.4.5</span>
+                    <span class="badge">v0.4.6</span>
                 </div>
                 <p style="font-size:1rem; color:#444; margin-bottom:1.5rem; max-width:560px; line-height:1.6;">
                     Lightweight reactive UI framework. No virtual DOM —
@@ -201,7 +201,7 @@ createApp({
 pnpm add github:vanjexdev/courvux
 
 # Pin to a tagged release (recommended for production)
-pnpm add github:vanjexdev/courvux#v0.4.5`,s2:`<script type="importmap">
+pnpm add github:vanjexdev/courvux#v0.4.6`,s2:`<script type="importmap">
 {
   "imports": {
     "courvux": "./node_modules/courvux/dist/index.js"
@@ -230,7 +230,7 @@ export default defineConfig({
 <script type="importmap">
 {
   "imports": {
-    "courvux": "https://cdn.jsdelivr.net/gh/vanjexdev/courvux@v0.4.5/dist/index.js"
+    "courvux": "https://cdn.jsdelivr.net/gh/vanjexdev/courvux@v0.4.6/dist/index.js"
   }
 }
 <\/script>
@@ -2189,10 +2189,10 @@ export default {
             ">
                 <!-- Logo -->
                 <div style="padding: 20px 16px 12px; border-bottom: 1px solid #f0f0f0;">
-                    <router-link to="/" @click="closeSidebar()" style="text-decoration:none; display:flex; align-items:center; gap:8px;" aria-label="Courvux v0.4.5 home">
+                    <router-link to="/" @click="closeSidebar()" style="text-decoration:none; display:flex; align-items:center; gap:8px;" aria-label="Courvux v0.4.6 home">
                         <span style="font-size:1.3rem;" aria-hidden="true">⚡</span>
                         <span style="font-weight:700; font-size:15px; color:#111;">Courvux</span>
-                        <span style="font-size:10px; color:#666; margin-left:2px;">v0.4.5</span>
+                        <span style="font-size:10px; color:#666; margin-left:2px;">v0.4.6</span>
                     </router-link>
                 </div>
 

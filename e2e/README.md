@@ -7,20 +7,73 @@ Internet share the strict `setAttribute` path that surfaced the 0.4.4 +
 
 ## Setup (one-time)
 
-```bash
-# 1. Install Playwright browsers (already a devDep)
-pnpm exec playwright install webkit chromium firefox
+### 1. Install Playwright browsers (already a devDep)
 
-# 2. Install OS-level deps Playwright's WebKit needs (Linux only)
+```bash
+pnpm exec playwright install webkit chromium firefox
+```
+
+Browser binaries live under `~/.cache/ms-playwright/` and are shared
+across projects.
+
+### 2. Install OS-level deps WebKit needs (Linux only)
+
+#### Ubuntu / Debian
+
+```bash
 sudo pnpm exec playwright install-deps
-# ...or, on Ubuntu/Debian:
+# ...or, manually:
 sudo apt-get install libicu74 libjpeg-turbo8 libwoff1 \
                      libgstreamer-plugins-bad1.0-0 libwebpdemux2 \
                      libavif16 libharfbuzz-icu0 libenchant-2-2 libsecret-1-0
 ```
 
-The browser binaries live under `~/.cache/ms-playwright/` and are shared
-across projects.
+#### Fedora
+
+`playwright install-deps` only knows Debian/Ubuntu, so install manually:
+
+```bash
+sudo dnf install -y libicu libjpeg-turbo woff2 \
+                    gstreamer1-plugins-bad-free \
+                    libwebp libavif harfbuzz-icu \
+                    enchant2 libsecret
+```
+
+Two extra steps Fedora needs:
+
+1. **Skip Playwright's host validator** — it checks via `dpkg` and always
+   fails on non-Debian distros even when the libs are installed:
+   ```bash
+   export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1
+   ```
+   (consider adding to your shell profile)
+
+2. **ICU version mismatch** — Playwright's WebKit links against
+   `libicudata.so.74` (Ubuntu 24.04) but Fedora ships ICU 76+. Symlink:
+   ```bash
+   sudo ln -sf /usr/lib64/libicudata.so.76 /usr/lib64/libicudata.so.74
+   sudo ln -sf /usr/lib64/libicui18n.so.76 /usr/lib64/libicui18n.so.74
+   sudo ln -sf /usr/lib64/libicuuc.so.76   /usr/lib64/libicuuc.so.74
+   sudo ln -sf /usr/lib64/libicuio.so.76   /usr/lib64/libicuio.so.74
+   ```
+   (replace `.76` with whatever `ls /usr/lib64/libicu*.so.*` reports)
+
+ICU's ABI is generally stable across major versions, so symlinks work
+in practice. If WebKit complains about another `lib*.so.NN`, find it
+with `ls /usr/lib64/lib<name>*` and apply the same symlink pattern.
+
+#### Docker fallback (any Linux)
+
+If juggling system libs is annoying, use Playwright's official image:
+
+```bash
+docker run --rm --ipc=host \
+  -v $(pwd):/work -w /work \
+  mcr.microsoft.com/playwright:v1.59.1-noble \
+  bash -c "pnpm install --frozen-lockfile && pnpm test:e2e:webkit"
+```
+
+Heavier (~1 GB image) but no host pollution.
 
 ## Running
 
