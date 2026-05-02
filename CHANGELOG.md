@@ -5,6 +5,52 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.5] — 2026-05-02
+
+### Bug fixes (preventive — Safari/Samsung Internet hardening)
+
+A repo-wide audit (roadmap Fase 1.1) of every `setAttribute` /
+`removeAttribute` / `element.attributes` loop found one more spot with
+the same class of bug as the router-link fix in 0.4.4: the HTML parser
+accepts attribute names containing `@` or `:` (`@click`, `:aria-label`,
+etc.) but the `setAttribute()` DOM API in Safari and Samsung Internet
+rejects them with `InvalidCharacterError`.
+
+#### `<component :is="...">` crashed when the original tag carried framework directives
+**File:** `src/index.ts` — `mountDynamic`
+The dynamic-component handler initialised the wrapper `<div>` with
+`Array.from(originalEl.attributes).forEach(a => newEl.setAttribute(a.name, a.value))`
+— same pattern that crashed `<router-link>` in 0.4.4. Any consumer
+writing
+`<component :is="active" @click="handler" :title="lbl">`
+would crash mount on stricter browsers.
+**Fix:** skip framework attribute names (`@`, `cv:on:`, `:`, `cv-`,
+`v-slot`) in the wrapper copy. The prop / `$emit` extraction below
+already reads them from the original element so nothing is lost.
+
+#### `cv-bind` defensive try/catch around setAttribute
+**File:** `src/dom.ts`
+`cv-bind` takes a free-form object whose keys become element
+attributes. A user passing `{ '@click': 'foo' }` would crash the
+entire walk on stricter browsers. Now wraps `setAttribute` /
+`removeAttribute` in try/catch with a `console.warn` — the rest of the
+bind keeps applying and the page stays alive.
+
+### Tests
+- `src/__tests__/dynamic-component.test.ts` (new, 5 tests) — including a regression that asserts `@`/`:`/`cv-*` attrs do **not** end up as raw DOM attributes on the wrapper.
+- `src/__tests__/cv-bind.test.ts` (new, 5 tests) — covers basic bind, removal, boolean coercion, falsy removal, and the invalid-name guard.
+- 128 unit tests total (was 118), 10 ssr, 20 ssg.
+
+### Audit findings (no action — for the record)
+- `removeAttribute` paths use either fixed strings or names from already-parsed DOM attrs; `removeAttribute` is permissive across major browsers.
+- `head.ts` `setAttribute` calls use known meta/link attribute names from the documented `HeadConfig` shape, plus `CSS.escape` on selector values.
+- `:hyphenated-prop` `setAttribute` only fires for names containing hyphens (data-\*, aria-\*) — all valid HTML attribute names.
+- No `setAttributeNS` / `getAttributeNS` in `src/`.
+- No `outerHTML` or `innerHTML +=` patterns in `src/`.
+- SVG / MathML namespaces are not processed by `walk()`.
+
+---
+
 ## [0.4.4] — 2026-05-01
 
 ### Bug fixes
