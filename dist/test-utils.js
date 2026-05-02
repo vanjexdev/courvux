@@ -1522,10 +1522,11 @@ function parseQuery(search) {
 }
 function setupRouterView(el, router, mount3, name = "default", onFirstRender) {
   const base = router.base ?? "";
+  const normalizePath = (p) => p.length > 1 && p.endsWith("/") ? p.slice(0, -1) : p;
   const getCurrentPath = () => {
-    if (router.mode === "history") return stripBase(window.location.pathname, base);
+    if (router.mode === "history") return normalizePath(stripBase(window.location.pathname, base));
     const hash = window.location.hash.slice(1) || "/";
-    return hash.split("?")[0] || "/";
+    return normalizePath(hash.split("?")[0] || "/");
   };
   const getCurrentQuery = () => {
     if (router.mode === "history") return parseQuery(window.location.search);

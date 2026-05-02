@@ -181,10 +181,18 @@ function parseQuery(search: string): Record<string, string> {
 
 export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn, name = 'default', onFirstRender?: () => void): () => void {
     const base = router.base ?? '';
+    // Treat `/foo/` and `/foo` as the same route. SSG output emits each
+    // page at `<route>/index.html` so direct URL hits land with a trailing
+    // slash, while route configs are typically written without one. Drop
+    // any trailing slash (except for the root `/` itself) so matchRoute()
+    // resolves both forms identically.
+    const normalizePath = (p: string): string =>
+        (p.length > 1 && p.endsWith('/')) ? p.slice(0, -1) : p;
+
     const getCurrentPath = () => {
-        if (router.mode === 'history') return stripBase(window.location.pathname, base);
+        if (router.mode === 'history') return normalizePath(stripBase(window.location.pathname, base));
         const hash = window.location.hash.slice(1) || '/';
-        return hash.split('?')[0] || '/';
+        return normalizePath(hash.split('?')[0] || '/');
     };
     const getCurrentQuery = () => {
         if (router.mode === 'history') return parseQuery(window.location.search);
