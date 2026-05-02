@@ -5,6 +5,36 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.6] — 2026-05-02
+
+### Bug fixes
+
+#### Router did not match SSG'd `<route>/index.html` URLs (trailing slash)
+**File:** `src/router.ts` — `setupRouterView`
+SSG output emits each page at `<route>/index.html` so direct URL hits and crawlers land at `/foo/` (with trailing slash), but route configs are written as `{ path: '/foo' }`. The previous `matchRoute` did an exact `r.path === path` comparison, so every direct deep-link to a SSG'd page fell through to the wildcard `NotFound` component on first load. Client-side navigation worked by accident because `navigate('/foo')` writes the configured form to history.
+**Fix:** `getCurrentPath` normalizes the pathname through a `normalizePath` helper that drops a single trailing `/` on any non-root path before `matchRoute` runs. `/` itself is preserved.
+**Surfaced by:** the new Playwright suite (Fase 1.2). Production users were hitting this every time they refreshed a page or shared a link.
+
+### Internal — testing infrastructure
+
+#### Playwright E2E suite (roadmap Fase 1.2)
+**Files:** `playwright.config.ts`, `e2e/site.spec.ts`, `e2e/README.md`
+Cross-browser regression suite focused on the WebKit class of bugs that surfaced in 0.4.4 / 0.4.5. Runs against the built docs site, so it exercises the same code production users see. Each test asserts `pageerror` / `console.error` arrays are empty — the silent-failure pattern that hid the original Safari crash.
+
+- 4 projects: `webkit`, `chromium`, `firefox`, `mobile-safari` (iPhone 14 viewport).
+- 10 scenarios: home mount, SSG-rendered code blocks (regression for 0.4.2), sidebar `<router-link>` with `@click` (regression for 0.4.4), direct deep-link hydration, wildcard NotFound, TodoMVC under cv-for + cv-model state changes, mobile sidebar toggle interpolation, sitemap / robots / 404.
+- New scripts: `pnpm test:e2e`, `pnpm test:e2e:webkit`, `pnpm test:e2e:mobile`, `pnpm test:e2e:ui`.
+- WebServer auto-spawn of `pnpm --dir site preview` on port 4173.
+- WebKit on Linux requires OS-level libs; the `e2e/README.md` documents the install path on Ubuntu / Fedora plus the `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=1` workaround for non-Debian distros where Playwright's `dpkg`-based validator misreports.
+
+### Tests
+- 131 unit (was 128 — +3 trailing-slash tests).
+- 10 SSR + 20 SSG unchanged.
+- 10 E2E on Chromium ✅, 10 on Firefox ✅. WebKit pending OS deps locally; CI integration deferred to Fase 5.2.
+- Bundle: 64.6 KB min.
+
+---
+
 ## [0.4.5] — 2026-05-02
 
 ### Bug fixes (preventive — Safari/Samsung Internet hardening)

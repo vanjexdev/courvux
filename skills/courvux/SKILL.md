@@ -21,7 +21,7 @@ All paths below are relative to the repo root (`vanjexdev/courvux`).
 | Examples | `examples/` |
 | Changelog | `CHANGELOG.md` |
 | Benchmarks | `BENCHMARKS.md` |
-| Current version | **0.4.5** |
+| Current version | **0.4.6** |
 | Repo | `https://github.com/vanjexdev/courvux` |
 | Live docs | `https://vanjexdev.github.io/courvux/` |
 
@@ -517,7 +517,7 @@ Only **top-level** `[cv-data]` elements are walked — nested ones are handled b
 
 ---
 
-## Top-level exports (v0.4.5)
+## Top-level exports (v0.4.6)
 
 **App**: `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
 **Router/Store**: `createRouter`, `createStore`
