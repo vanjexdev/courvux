@@ -7,13 +7,13 @@
 </p>
 
 <p align="center">
-  <img alt="version"  src="https://img.shields.io/badge/version-0.4.6-blue">
+  <img alt="version"  src="https://img.shields.io/badge/version-0.4.7-blue">
   <img alt="size"     src="https://img.shields.io/badge/gzip-~20kB-brightgreen">
   <img alt="license"  src="https://img.shields.io/badge/license-MIT-lightgrey">
   <img alt="ts"       src="https://img.shields.io/badge/TypeScript-strict-3178c6">
 </p>
 
-**Author:** Vanjex — **Version:** 0.4.6
+**Author:** Vanjex — **Version:** 0.4.7
 
 ---
 
@@ -76,7 +76,7 @@ Courvux targets **the last two major versions** of each modern browser. The fram
 
 **What "supported" means:** every release runs unit tests + SSR / SSG self-tests + a Playwright E2E suite on Chromium and Firefox. WebKit-class browsers (Safari, Samsung Internet, iOS WebView) are validated on real devices for each release plus by the WebKit project in Playwright (CI integration is roadmap Fase 5.2).
 
-If you hit a bug on a supported browser, [open an issue](https://github.com/vanjexdev/courvux/issues) — these are first-priority fixes, same class as the 0.4.4 / 0.4.5 / 0.4.6 patches.
+If you hit a bug on a supported browser, [open an issue](https://github.com/vanjexdev/courvux/issues) — these are first-priority fixes, same class as the 0.4.4 / 0.4.5 / 0.4.7 patches.
 
 ---
 
@@ -185,7 +185,7 @@ npm install github:vanjexdev/courvux
 Pin a tag for stable installs:
 
 ```bash
-pnpm add github:vanjexdev/courvux#v0.4.6
+pnpm add github:vanjexdev/courvux#v0.4.7
 ```
 
 **Without a bundler** — use an import map:
@@ -2646,7 +2646,7 @@ Courvux is **pre-1.0** and not yet on npm — install via the GitHub URL with a 
 - The framework choice is a contractual / regulatory blocker — pre-1.0 software, even when stable, may not meet that bar.
 
 **What we measure for "stable"**
-Every release runs unit tests + SSR / SSG self-tests + Playwright E2E on Chromium and Firefox + a real-device manual smoke on Safari iOS and Samsung Internet (see [`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md)). Bugs that affect supported browsers are first-priority fixes (the 0.4.4 / 0.4.5 / 0.4.6 patches are how this works in practice).
+Every release runs unit tests + SSR / SSG self-tests + Playwright E2E on Chromium and Firefox + a real-device manual smoke on Safari iOS and Samsung Internet (see [`RELEASE_CHECKLIST.md`](./RELEASE_CHECKLIST.md)). Bugs that affect supported browsers are first-priority fixes (the 0.4.4 / 0.4.5 / 0.4.7 patches are how this works in practice).
 
 ---
 
@@ -2672,7 +2672,7 @@ If you're shipping something with Courvux, [open a PR](https://github.com/vanjex
 
 ## Top-level exports
 
-Everything exported from `'courvux'` (v0.4.6):
+Everything exported from `'courvux'` (v0.4.7):
 
 **App & lifecycle:**
 `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
