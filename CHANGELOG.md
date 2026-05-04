@@ -5,6 +5,25 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.4.7] — 2026-05-02
+
+### Bug fixes
+
+#### `cv-model` did not react to programmatic mutations of nested-path bindings
+**File:** `src/dom.ts`
+Inputs bound with `cv-model="form.first_name"` (and other dotted paths) silently failed to update when their state was mutated from a method — e.g. hydrating a drawer form with `this.form.first_name = data.first_name`. State logged the new value but the input value stayed empty.
+**Cause:** `cv-model` registered listeners via `subscribeExpr`, which uses the expression literally as the listener key (`'form.first_name'`). Reactivity only fires `notifyKey('form')` when nested properties of `form` mutate — listeners under the dotted-path key are orphaned. Same class of bug that the 0.4.0 `subscribeDeps` fix solved for `cv-if` / interpolation, but `cv-model` wasn't on that path.
+**Fix:** all four `cv-model` paths (text input, checkbox, radio, contenteditable) now subscribe through `subscribeDeps`, which reduces dotted tokens to their root key and lets `notifyKey('form')` reach the listener correctly.
+
+Same fix applied to the `<router-link :to="...">` subscription, which had the identical pattern. `:to="'/user/' + user.id"` now reacts to `state.user.id` mutations.
+
+### Tests
+- `src/__tests__/cv-model-nested.test.ts` (new, 3 tests): text input, checkbox, and select bound to nested paths each verify programmatic state mutation updates the DOM.
+- 134 unit (was 131), 10 ssr, 20 ssg, 10 e2e on Chromium / Firefox.
+- Bundle: 64.6 KB min.
+
+---
+
 ## [0.4.6] — 2026-05-02
 
 ### Bug fixes
