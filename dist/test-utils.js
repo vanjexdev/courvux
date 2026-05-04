@@ -963,7 +963,7 @@ async function walk(el, state, context) {
           const val = evaluate(expr, state);
           inputEl.checked = Array.isArray(val) ? val.includes(inputEl.value) : !!val;
         };
-        subscribeExpr(expr, context, update);
+        subscribeDeps(expr, context, update);
         update();
         inputEl.addEventListener("change", () => {
           const val = evaluate(expr, state);
@@ -984,7 +984,7 @@ async function walk(el, state, context) {
         const update = () => {
           inputEl.checked = evaluate(expr, state) === inputEl.value;
         };
-        subscribeExpr(expr, context, update);
+        subscribeDeps(expr, context, update);
         update();
         inputEl.addEventListener("change", () => {
           if (inputEl.checked) setStateValue(expr, state, applyMods(inputEl.value));
@@ -995,7 +995,7 @@ async function walk(el, state, context) {
           const val = String(evaluate(expr, state) ?? "");
           if (ceEl.innerText !== val) ceEl.innerText = val;
         };
-        subscribeExpr(expr, context, update);
+        subscribeDeps(expr, context, update);
         update();
         if (mods.has("debounce")) {
           const delayMod = [...mods].find((m) => /^\d+$/.test(m));
@@ -1013,7 +1013,7 @@ async function walk(el, state, context) {
         const update = () => {
           inputEl.value = evaluate(expr, state) ?? "";
         };
-        subscribeExpr(expr, context, update);
+        subscribeDeps(expr, context, update);
         update();
         if (mods.has("debounce")) {
           const delayMod = [...mods].find((m) => /^\d+$/.test(m));
@@ -1188,7 +1188,7 @@ async function walk(el, state, context) {
       } else {
         window.addEventListener("hashchange", updateActive);
       }
-      if (toExpr) subscribeExpr(toExpr, context, updateActive);
+      if (toExpr) subscribeDeps(toExpr, context, updateActive);
       updateActive();
       const linkFrag = document.createDocumentFragment();
       linkFrag.appendChild(a);
