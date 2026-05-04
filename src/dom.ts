@@ -926,7 +926,7 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                     const val = evaluate(expr, state);
                     inputEl.checked = Array.isArray(val) ? val.includes(inputEl.value) : !!val;
                 };
-                subscribeExpr(expr, context, update);
+                subscribeDeps(expr, context, update);
                 update();
                 inputEl.addEventListener('change', () => {
                     const val = evaluate(expr, state);
@@ -941,7 +941,7 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 });
             } else if (type === 'radio') {
                 const update = () => { inputEl.checked = evaluate(expr, state) === inputEl.value; };
-                subscribeExpr(expr, context, update);
+                subscribeDeps(expr, context, update);
                 update();
                 inputEl.addEventListener('change', () => {
                     if (inputEl.checked) setStateValue(expr, state, applyMods(inputEl.value));
@@ -952,7 +952,7 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                     const val = String(evaluate(expr, state) ?? '');
                     if (ceEl.innerText !== val) ceEl.innerText = val;
                 };
-                subscribeExpr(expr, context, update);
+                subscribeDeps(expr, context, update);
                 update();
 
                 if (mods.has('debounce')) {
@@ -969,7 +969,7 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 }
             } else {
                 const update = () => { inputEl.value = evaluate(expr, state) ?? ''; };
-                subscribeExpr(expr, context, update);
+                subscribeDeps(expr, context, update);
                 update();
 
                 if (mods.has('debounce')) {
@@ -1165,7 +1165,7 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             } else {
                 window.addEventListener('hashchange', updateActive);
             }
-            if (toExpr) subscribeExpr(toExpr, context, updateActive);
+            if (toExpr) subscribeDeps(toExpr, context, updateActive);
             updateActive();
 
             // Wrap in a DocumentFragment before walking so framework
