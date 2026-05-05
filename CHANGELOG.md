@@ -5,6 +5,62 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.6.0] — 2026-05-05
+
+Minor — flips the default for `cv-html` from raw to sanitized. **Breaking
+change** for any binding that intentionally rendered raw HTML; everything
+else is unaffected.
+
+### ⚠️ BREAKING — `cv-html` sanitizes by default
+
+**File:** `src/dom.ts`
+Pre-0.6 behavior: bare `cv-html="expr"` set `innerHTML` raw, and you
+opted INTO sanitization with `cv-html.sanitize`. That meant every
+careless use of the directive — interpolating user-provided markup into
+a page — was an XSS by default. Inverted: bare `cv-html` now strips
+`<script>`, `on*=` event handlers, `javascript:` URLs, and a
+documented set of dangerous tags before assigning. Opt OUT with the new
+`.raw` modifier when the markup is something you authored (Markdown
+rendered server-side, hand-curated copy, etc.).
+
+**Migration:**
+```bash
+# Find every cv-html binding in the project:
+grep -rn 'cv-html' src/
+
+# For each one, ask: "is this markup from a trusted source?"
+#   - YES → switch to cv-html.raw (preserves old behavior)
+#   - NO  → leave as cv-html (now safe by default)
+```
+
+The pre-0.6 `cv-html.sanitize` modifier still works as a no-op so
+existing templates keep behaving correctly without edits — sanitization
+is just the default now. Removing the redundant `.sanitize` is a
+cleanup, not a fix.
+
+Internal example update: `examples/03-ssg-blog/src/pages/Post.js`
+switches its post-body binding to `cv-html.raw` since the post bodies
+are hand-authored HTML in `posts.js`.
+
+### Tests
+- `src/__tests__/cv-html.test.ts` (new, 7 tests): bare cv-html sanitizes
+  safe markup, strips `<script>`, strips `on*=`, strips `javascript:`,
+  `cv-html.raw` preserves dangerous markup, `cv-html.sanitize`
+  back-compat path still sanitizes, reactive update flow.
+- 155 unit (was 148), 10 ssr, 20 ssg.
+- Bundle: 66.2 KB min, 21.5 KB gzip (no measurable change).
+
+### Docs
+- `/template` cv-html section reframes default as "sanitized" with a
+  callout about the breaking change and the legacy `.sanitize`
+  back-compat.
+- README cv-html section rewritten with same framing.
+- `/migrating-from-vue` and `/migrating-from-alpine` rows updated to
+  point at `cv-html.raw` for the parity behavior.
+- `skills/courvux/SKILL.md` quick-ref row updated.
+
+---
+
 ## [0.5.3] — 2026-05-05
 
 Patch — finishes the `cv-model` write-side fix from 0.5.2.

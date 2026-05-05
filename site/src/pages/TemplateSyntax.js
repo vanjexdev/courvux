@@ -78,11 +78,13 @@ export default {
 <input cv-model.number="price" />   <!-- coerce to number -->
 <input cv-model.debounce="search" />        <!-- 300ms debounce -->
 <input cv-model.debounce.500="search" />    <!-- custom delay -->`,
-        s_cvhtml: `<!-- Raw innerHTML — use only with trusted content -->
-<div cv-html="richContent"></div>
+        s_cvhtml: `<!-- Sanitized by default — strips <script>, on*= handlers, javascript: URLs.
+     Safe for user-submitted content. -->
+<div cv-html="userContent"></div>
 
-<!-- Sanitized — strips scripts, event handlers, javascript: URLs -->
-<div cv-html.sanitize="userContent"></div>`,
+<!-- Opt out of sanitization with .raw — only for content YOU authored
+     (Markdown rendered server-side, hand-curated HTML, etc.) -->
+<div cv-html.raw="myTrustedContent"></div>`,
         s_cvdata: `<!-- Inline reactive scope — no component registration needed -->
 <div cv-data="{ count: 0 }">
     <button @click="count--">−</button>
@@ -148,7 +150,11 @@ export default {
             <code-block :lang="'html'" :code="s_cvmodel"></code-block>
 
             <h2>cv-html</h2>
+            <p>Sets <code>innerHTML</code>. Sanitized by default — strips <code>&lt;script&gt;</code>, <code>on*=</code> handlers, and <code>javascript:</code> URLs so user-submitted content is safe to render. Add <code>.raw</code> to opt out when the markup is something you authored (Markdown rendered server-side, hand-curated copy).</p>
             <code-block :lang="'html'" :code="s_cvhtml"></code-block>
+            <div class="callout warning">
+                <strong>Breaking change in 0.6.0:</strong> the default flipped from raw to sanitized. The pre-0.6 <code>cv-html.sanitize</code> still works (it's now a no-op). To restore the old raw behavior on a binding you control, switch <code>cv-html</code> → <code>cv-html.raw</code>.
+            </div>
 
             <h2>cv-data — inline scope</h2>
             <p>Self-contained reactive scope without component registration. Lighter than components — no lifecycle, no slots, no emits.</p>
