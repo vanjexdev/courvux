@@ -5,6 +5,41 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.5.3] — 2026-05-05
+
+Patch — finishes the `cv-model` write-side fix from 0.5.2.
+
+### Bug fixes
+
+#### `cv-model` bracket notation broke when the dynamic key came from a `cv-for` iteration variable
+**File:** `src/dom.ts` — `setStateValue`
+The 0.5.2 implementation compiled `with(__s__){ (${expr}) = __v__ }`. That
+worked at top level but silently wrote `undefined` whenever the `state`
+passed in was the per-iteration `mergedItemState` proxy used by `cv-for`,
+because the proxy's catch-all `has` trap (returns `true` for every
+identifier so reads can fall through to the parent state) ALSO captured the
+function's `__v__` parameter. `__v__` resolved to `state.__v__` inside the
+`with`, which is `undefined`. Surfaced by the kanban "Add a card" inputs
+once 0.5.2 enabled the read+write asymmetry: button enabled because the
+input's typed character briefly hit state, then the next render read it
+back as `undefined` and cleared the field.
+**Fix:** stop using `with(...)` for the assignment. Split the expression
+into a parent expression and a final key (`draft[col.key]` →
+`{ parent: 'draft', keyExpr: 'col.key' }`), evaluate both via the existing
+`evaluate()` (which uses `with(state)` only for reads, where the value
+parameter doesn't exist), then assign `obj[key] = value` in plain scope —
+no with, no shadowing. The split is cached per expression.
+
+### Tests
+- `src/__tests__/cv-model.test.ts` — new regression covering bracket
+  notation keyed by a `cv-for` iteration variable (two inputs in two
+  iterations, each writes back to the right key).
+- 148 unit (was 147), 10 ssr, 20 ssg.
+- Bundle: 66.2 KB min, 21.5 KB gzip (+0.4 KB / +0.2 KB from the lvalue
+  splitter + cache).
+
+---
+
 ## [0.5.2] — 2026-05-05
 
 Patch — `cv-model` write side now matches the read side's expressivity.

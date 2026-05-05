@@ -88,24 +88,69 @@ export const subscribeDeps = (expr: string, context: WalkContext, cb: Function):
     return () => unsubs.forEach(u => u());
 };
 
-// Cache `new Function` writers so cv-model on the same path doesn't pay the
-// compile cost on every keystroke.
-const writerCache = new Map<string, Function>();
+// Cache parsed lvalue splits so cv-model on the same path doesn't re-walk the
+// expression on every keystroke. Each entry is { parent, keyExpr }.
+const lvalueCache = new Map<string, { parent: string; keyExpr: string }>();
+
+// Split an assignable expression into the parent expression and the final
+// member access. `draft[col.key]` → { parent: 'draft', keyExpr: 'col.key' }.
+// `user.profile.name`            → { parent: 'user.profile', keyExpr: '"name"' }.
+// `name`                         → { parent: '', keyExpr: '"name"' }.
+// We do this so the assignment can run OUTSIDE any `with(state)` scope —
+// otherwise the value parameter would be captured by the proxy's catch-all
+// `has` trap and resolve to undefined.
+const splitLvalue = (expr: string): { parent: string; keyExpr: string } => {
+    const cached = lvalueCache.get(expr);
+    if (cached) return cached;
+
+    const t = expr.trim();
+    let depth = 0;
+    let lastIdx = -1;
+    let lastKind: 'dot' | 'bracket' | null = null;
+
+    for (let i = 0; i < t.length; i++) {
+        const c = t[i];
+        if (c === '[') {
+            if (depth === 0) { lastIdx = i; lastKind = 'bracket'; }
+            depth++;
+        } else if (c === ']') {
+            depth--;
+        } else if (c === '.' && depth === 0) {
+            lastIdx = i; lastKind = 'dot';
+        }
+    }
+
+    let result: { parent: string; keyExpr: string };
+    if (lastIdx < 0) {
+        result = { parent: '', keyExpr: JSON.stringify(t) };
+    } else if (lastKind === 'dot') {
+        result = { parent: t.slice(0, lastIdx), keyExpr: JSON.stringify(t.slice(lastIdx + 1)) };
+    } else {
+        const closing = t.lastIndexOf(']');
+        result = closing > lastIdx
+            ? { parent: t.slice(0, lastIdx), keyExpr: t.slice(lastIdx + 1, closing) }
+            : { parent: '', keyExpr: JSON.stringify(t) }; // malformed → treat as bare
+    }
+    lvalueCache.set(expr, result);
+    return result;
+};
 
 export const setStateValue = (expr: string, state: any, value: any) => {
-    // `new Function` lets cv-model + setStateValue write to any assignable
-    // expression that `evaluate` can read — bracket notation with dynamic
-    // keys (`draft[col.key]`), nested chains, computed indices. Without
-    // this, cv-model's read side accepted them but the write side silently
-    // dropped the update, leaving the input "live but disconnected".
+    // The read side of cv-model goes through `evaluate()`, which compiles
+    // `with(state) { return (expr) }` and handles any readable expression
+    // (bracket notation with dynamic keys, deep dot paths, etc.). Before
+    // this rewrite the write side did `expr.split('.')`, so anything but a
+    // dot path was silently dropped — the input "looked live but
+    // disconnected." We now mirror evaluate's expressivity by splitting the
+    // lvalue into parent + key, evaluating each through evaluate(), then
+    // assigning outside any `with(...)` scope.
     if (evalSupported) {
         try {
-            let fn = writerCache.get(expr);
-            if (!fn) {
-                fn = new Function('__s__', '__v__', `with(__s__){ (${expr}) = __v__ }`);
-                writerCache.set(expr, fn);
-            }
-            fn(state, value);
+            const { parent, keyExpr } = splitLvalue(expr);
+            const obj = parent ? evaluate(parent, state) : state;
+            const key = evaluate(keyExpr, state);
+            if (obj == null) return;
+            obj[key] = value;
             return;
         } catch (e) {
             console.warn(`[courvux] setStateValue: write failed for "${expr}":`, e);

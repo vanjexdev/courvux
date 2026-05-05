@@ -188,16 +188,49 @@ var subscribeDeps = (expr, context, cb) => {
   const unsubs = deps.map((dep) => subscribeExpr(dep, context, cb));
   return () => unsubs.forEach((u) => u());
 };
-var writerCache = /* @__PURE__ */ new Map();
+var lvalueCache = /* @__PURE__ */ new Map();
+var splitLvalue = (expr) => {
+  const cached = lvalueCache.get(expr);
+  if (cached) return cached;
+  const t = expr.trim();
+  let depth = 0;
+  let lastIdx = -1;
+  let lastKind = null;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (c === "[") {
+      if (depth === 0) {
+        lastIdx = i;
+        lastKind = "bracket";
+      }
+      depth++;
+    } else if (c === "]") {
+      depth--;
+    } else if (c === "." && depth === 0) {
+      lastIdx = i;
+      lastKind = "dot";
+    }
+  }
+  let result;
+  if (lastIdx < 0) {
+    result = { parent: "", keyExpr: JSON.stringify(t) };
+  } else if (lastKind === "dot") {
+    result = { parent: t.slice(0, lastIdx), keyExpr: JSON.stringify(t.slice(lastIdx + 1)) };
+  } else {
+    const closing = t.lastIndexOf("]");
+    result = closing > lastIdx ? { parent: t.slice(0, lastIdx), keyExpr: t.slice(lastIdx + 1, closing) } : { parent: "", keyExpr: JSON.stringify(t) };
+  }
+  lvalueCache.set(expr, result);
+  return result;
+};
 var setStateValue = (expr, state, value) => {
   if (evalSupported) {
     try {
-      let fn = writerCache.get(expr);
-      if (!fn) {
-        fn = new Function("__s__", "__v__", `with(__s__){ (${expr}) = __v__ }`);
-        writerCache.set(expr, fn);
-      }
-      fn(state, value);
+      const { parent, keyExpr } = splitLvalue(expr);
+      const obj = parent ? evaluate(parent, state) : state;
+      const key = evaluate(keyExpr, state);
+      if (obj == null) return;
+      obj[key] = value;
       return;
     } catch (e) {
       console.warn(`[courvux] setStateValue: write failed for "${expr}":`, e);
