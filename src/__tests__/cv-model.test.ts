@@ -71,4 +71,43 @@ describe('cv-model', () => {
         expect(w.state.checked).toBe(true);
         w.destroy();
     });
+
+    // Regression: cv-model's read side accepted bracket notation (handled by
+    // evaluate's new Function path), but setStateValue only parsed dot paths,
+    // so user input was silently dropped — input looked "live but disconnected".
+    it('writes back to bracket notation with a literal key', async () => {
+        const w = await mount({
+            template: '<input cv-model="form[\'first_name\']">',
+            data: { form: { first_name: '' } }
+        });
+        const input = w.find('input') as HTMLInputElement;
+        input.value = 'Ada';
+        await w.trigger(input, 'input');
+        expect((w.state as any).form.first_name).toBe('Ada');
+        w.destroy();
+    });
+
+    it('writes back to bracket notation with a dynamic key from state', async () => {
+        const w = await mount({
+            template: '<input cv-model="draft[colKey]">',
+            data: { draft: { backlog: '' }, colKey: 'backlog' }
+        });
+        const input = w.find('input') as HTMLInputElement;
+        input.value = 'Buy milk';
+        await w.trigger(input, 'input');
+        expect((w.state as any).draft.backlog).toBe('Buy milk');
+        w.destroy();
+    });
+
+    it('writes back to a deep dot path', async () => {
+        const w = await mount({
+            template: '<input cv-model="user.profile.name">',
+            data: { user: { profile: { name: '' } } }
+        });
+        const input = w.find('input') as HTMLInputElement;
+        input.value = 'Grace';
+        await w.trigger(input, 'input');
+        expect((w.state as any).user.profile.name).toBe('Grace');
+        w.destroy();
+    });
 });

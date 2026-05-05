@@ -88,7 +88,33 @@ export const subscribeDeps = (expr: string, context: WalkContext, cb: Function):
     return () => unsubs.forEach(u => u());
 };
 
+// Cache `new Function` writers so cv-model on the same path doesn't pay the
+// compile cost on every keystroke.
+const writerCache = new Map<string, Function>();
+
 export const setStateValue = (expr: string, state: any, value: any) => {
+    // `new Function` lets cv-model + setStateValue write to any assignable
+    // expression that `evaluate` can read — bracket notation with dynamic
+    // keys (`draft[col.key]`), nested chains, computed indices. Without
+    // this, cv-model's read side accepted them but the write side silently
+    // dropped the update, leaving the input "live but disconnected".
+    if (evalSupported) {
+        try {
+            let fn = writerCache.get(expr);
+            if (!fn) {
+                fn = new Function('__s__', '__v__', `with(__s__){ (${expr}) = __v__ }`);
+                writerCache.set(expr, fn);
+            }
+            fn(state, value);
+            return;
+        } catch (e) {
+            console.warn(`[courvux] setStateValue: write failed for "${expr}":`, e);
+            return;
+        }
+    }
+    // CSP-strict fallback (no `unsafe-eval`): only supports dot paths. Bracket
+    // notation and dynamic keys are unreachable here — they were unreachable
+    // before this patch too, so nothing regresses.
     const parts = expr.split('.');
     if (parts.length === 1) {
         state[parts[0]] = value;

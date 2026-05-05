@@ -5,6 +5,38 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.5.2] — 2026-05-05
+
+Patch — `cv-model` write side now matches the read side's expressivity.
+
+### Bug fixes
+
+#### `cv-model` silently dropped updates with bracket notation
+**File:** `src/dom.ts` — `setStateValue`
+The read side of `cv-model` (and any other place that called `evaluate`)
+already accepted any assignable expression — `form[key]`, `draft[col.key]`,
+deep dot chains — because it goes through the `new Function` evaluator.
+The write side, `setStateValue`, parsed the expression as a literal dot
+path: `expr.split('.')`. So `cv-model="draft[col.key]"` rendered the
+correct value but every keystroke was silently swallowed: input "live but
+disconnected." Surfaced by the kanban example's per-column "Add a card"
+form (one input per iteration of `cv-for="col in columns"`).
+**Fix:** `setStateValue` now compiles a `new Function('__s__', '__v__',
+\`with(__s__){ (${expr}) = __v__ }\`)` writer (cached per expression) when
+the runtime supports `eval`, identical to how `evaluate` reads. The
+existing dot-path code stays as the CSP-strict fallback — that path was
+already the only thing strict-CSP apps had, so nothing regresses.
+
+### Tests
+- `src/__tests__/cv-model.test.ts` — three new regressions: bracket
+  notation with literal key, bracket notation with dynamic key from
+  state, deep dot path.
+- 147 unit (was 144), 10 ssr, 20 ssg.
+- Bundle: 65.8 KB min, 21.3 KB gzip (+0.2 KB / +0.0 KB from the cache
+  + writer compile).
+
+---
+
 ## [0.5.1] — 2026-05-05
 
 Patch — race-condition fix in `cv-for` keyed reconciliation, exposed by the new
