@@ -822,6 +822,7 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             i = j;
 
             let activeClone: Node | null = null;
+            let activeIdx = -1;
             let rendering = false;
             let dirty = false;
 
@@ -831,19 +832,38 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 try {
                     do {
                         dirty = false;
-                        if (activeClone) { activeClone.parentNode?.removeChild(activeClone); activeClone = null; }
-                        for (const branch of chain) {
+                        // Resolve which branch matches with the current state.
+                        // Track the index so a re-render that lands on the
+                        // same branch leaves the existing DOM (and any input
+                        // focus / cursor selection / mid-IME composition) in
+                        // place. Only swap when the active branch actually
+                        // changes — interpolations + bindings inside the
+                        // active branch already have their own subscriptions
+                        // and update on their own.
+                        let nextIdx = -1;
+                        for (let bi = 0; bi < chain.length; bi++) {
+                            const branch = chain[bi];
                             if (branch.condition === null || !!evaluate(branch.condition, state)) {
-                                const clone = branch.template.cloneNode(true) as HTMLElement;
-                                const frag = document.createDocumentFragment();
-                                frag.appendChild(clone);
-                                await walk(frag, state, context);
-                                const actualEl = (frag.firstChild ?? clone) as HTMLElement;
-                                branch.anchor.parentNode?.insertBefore(frag, branch.anchor.nextSibling);
-                                activeClone = actualEl;
+                                nextIdx = bi;
                                 break;
                             }
                         }
+                        if (nextIdx === activeIdx && activeClone) {
+                            // Same branch is still active — its content reacts
+                            // through its own deps, no remount needed.
+                            continue;
+                        }
+                        if (activeClone) { activeClone.parentNode?.removeChild(activeClone); activeClone = null; }
+                        activeIdx = nextIdx;
+                        if (nextIdx < 0) continue;
+                        const branch = chain[nextIdx];
+                        const clone = branch.template.cloneNode(true) as HTMLElement;
+                        const frag = document.createDocumentFragment();
+                        frag.appendChild(clone);
+                        await walk(frag, state, context);
+                        const actualEl = (frag.firstChild ?? clone) as HTMLElement;
+                        branch.anchor.parentNode?.insertBefore(frag, branch.anchor.nextSibling);
+                        activeClone = actualEl;
                     } while (dirty);
                 } finally {
                     rendering = false;

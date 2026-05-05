@@ -58,4 +58,63 @@ describe('cv-if / cv-else-if / cv-else', () => {
         expect(w.text()).toBe('empty');
         w.destroy();
     });
+
+    // Regression for the Tauri-notepad input-focus loss: every keystroke
+    // mutated `selected.updatedAt` → notify on `notes` → computed `selected`
+    // recomputed → notify on `selected` → cv-if re-ran. The previous
+    // implementation removed and re-cloned the active branch every time, so
+    // the <input> inside the cv-else lost focus mid-typing. cv-if now
+    // compares the active branch index and skips the rebuild when it hasn't
+    // changed — the branch's own bindings still update via their own
+    // subscriptions.
+    it('does not rebuild the active branch when its dependencies fire but the truthy branch does not change', async () => {
+        const w = await mount({
+            template: `
+                <div>
+                    <p cv-if="!current">empty</p>
+                    <p cv-else>{{ current.title }}</p>
+                </div>
+            `,
+            data: {
+                items: [{ id: 1, title: 'first' }, { id: 2, title: 'second' }],
+                selectedId: 1,
+            },
+            computed: {
+                current(this: any) {
+                    return this.items.find((it: any) => it.id === this.selectedId) ?? null;
+                },
+            },
+        });
+
+        // Capture the initial DOM node so we can prove identity stability.
+        const initialP = w.find('p')!;
+        expect(initialP.textContent?.trim()).toBe('first');
+
+        // Mutate `items` (touches a dep of `current`) without changing the
+        // truthy/falsy branch. Old behavior: cv-if re-cloned the <p>, so
+        // findAll('p')[0] was a NEW node. Fixed behavior: same node reused.
+        (w.state.items[0] as any).title = 'first edited';
+        await w.nextTick();
+
+        const afterEditP = w.find('p')!;
+        expect(afterEditP).toBe(initialP);                  // same DOM node
+        expect(afterEditP.textContent?.trim()).toBe('first edited');
+
+        // Switching the selected note keeps `current` truthy → still cv-else
+        // branch → still the same clone, just with updated interpolation.
+        w.state.selectedId = 2;
+        await w.nextTick();
+        const afterSelectP = w.find('p')!;
+        expect(afterSelectP).toBe(initialP);
+        expect(afterSelectP.textContent?.trim()).toBe('second');
+
+        // Forcing a branch flip (no current) DOES rebuild — different branch.
+        w.state.selectedId = 999;
+        await w.nextTick();
+        const emptyP = w.find('p')!;
+        expect(emptyP).not.toBe(initialP);                  // new clone for cv-if branch
+        expect(emptyP.textContent?.trim()).toBe('empty');
+
+        w.destroy();
+    });
 });
