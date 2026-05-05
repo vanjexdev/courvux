@@ -10,7 +10,10 @@ export default {
             <p class="back"><router-link to="/">← Back to all posts</router-link></p>
             <h1>{{ post.title }}</h1>
             <p class="meta">{{ post.date }}</p>
-            <div cv-html="post.body"></div>
+            <!-- post.body is hand-authored HTML in posts.js (trusted), so opt out
+                 of cv-html's default sanitization with .raw. For user-submitted
+                 content drop the .raw and let cv-html strip XSS vectors. -->
+            <div cv-html.raw="post.body"></div>
         </article>
 
         <article cv-else>

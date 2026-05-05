@@ -990,7 +990,8 @@ async function walk(el, state, context) {
       if (htmlAttr) {
         const expr = htmlAttr.value;
         element.removeAttribute(htmlAttr.name);
-        const doSanitize = htmlAttr.name.split(".").slice(1).includes("sanitize");
+        const mods = htmlAttr.name.split(".").slice(1);
+        const doSanitize = !mods.includes("raw");
         const update = () => {
           const raw = String(evaluate(expr, state) ?? "");
           element.innerHTML = doSanitize ? sanitizeHtml(raw) : raw;

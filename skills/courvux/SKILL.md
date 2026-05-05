@@ -21,7 +21,7 @@ All paths below are relative to the repo root (`vanjexdev/courvux`).
 | Examples | `examples/` |
 | Changelog | `CHANGELOG.md` |
 | Benchmarks | `BENCHMARKS.md` |
-| Current version | **0.5.3** |
+| Current version | **0.6.0** |
 | Repo | `https://github.com/vanjexdev/courvux` |
 | Live docs | `https://vanjexdev.github.io/courvux/` |
 
@@ -72,7 +72,7 @@ createApp(config).magic('fmt', () => ({ currency: v => `$${v.toFixed(2)}` })).mo
 | `cv-for="(val, key) in obj"` | Object iteration |
 | `cv-model="prop"` | Two-way binding (input/select/checkbox/radio) |
 | `cv-model.lazy` / `.trim` / `.number` / `.debounce[.NN]` | Modifiers |
-| `cv-html="expr"` / `cv-html.sanitize` | innerHTML (raw or sanitized) |
+| `cv-html="expr"` (sanitized by default) / `cv-html.raw` (opt-out) | innerHTML — strips `<script>`, `on*=`, `javascript:` unless `.raw` |
 | `cv-ref="name"` / `:cv-ref="'edit_'+id"` | Refs (static or dynamic) |
 | `cv-data="{ key: val }"` | Inline reactive scope |
 | `cv-once` | Render once, skip future updates |
@@ -517,7 +517,7 @@ Only **top-level** `[cv-data]` elements are walked — nested ones are handled b
 
 ---
 
-## Top-level exports (v0.5.3)
+## Top-level exports (v0.6.0)
 
 **App**: `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
 **Router/Store**: `createRouter`, `createStore`

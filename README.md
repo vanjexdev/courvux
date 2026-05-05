@@ -7,13 +7,13 @@
 </p>
 
 <p align="center">
-  <img alt="version"  src="https://img.shields.io/badge/version-0.5.3-blue">
+  <img alt="version"  src="https://img.shields.io/badge/version-0.6.0-blue">
   <img alt="size"     src="https://img.shields.io/badge/gzip-~20kB-brightgreen">
   <img alt="license"  src="https://img.shields.io/badge/license-MIT-lightgrey">
   <img alt="ts"       src="https://img.shields.io/badge/TypeScript-strict-3178c6">
 </p>
 
-**Author:** Vanjex — **Version:** 0.5.3
+**Author:** Vanjex — **Version:** 0.6.0
 
 ---
 
@@ -185,7 +185,7 @@ npm install github:vanjexdev/courvux
 Pin a tag for stable installs:
 
 ```bash
-pnpm add github:vanjexdev/courvux#v0.5.3
+pnpm add github:vanjexdev/courvux#v0.6.0
 ```
 
 **Without a bundler** — use an import map:
@@ -552,17 +552,19 @@ Toggles `display: none` — element stays in the DOM.
 
 ### `cv-html`
 
-Sets `innerHTML` reactively.
+Sets `innerHTML` reactively. **Sanitized by default** since 0.6.0 — strips `<script>`, `on*=` handlers, and `javascript:` URLs so user-submitted content is safe to render. Add `.raw` to opt out when the markup is something you authored (Markdown rendered server-side, hand-curated copy).
 
 ```html
-<!-- Raw — use only with trusted content -->
-<div cv-html="richContent"></div>
+<!-- Sanitized (default) — safe for user-submitted content -->
+<div cv-html="userContent"></div>
 
-<!-- Sanitized — strips scripts, event handlers, and dangerous elements -->
-<div cv-html.sanitize="userContent"></div>
+<!-- Raw — only for content you authored and trust -->
+<div cv-html.raw="myTrustedContent"></div>
 ```
 
-`.sanitize` uses the native [Sanitizer API](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Sanitizer_API) when available, and falls back to a DOMParser-based approach that removes `<script>`, `<iframe>`, `onerror`/`onclick` inline handlers, and `javascript:` URLs.
+The sanitizer uses the native [Sanitizer API](https://developer.mozilla.org/en-US/docs/Web/API/HTML_Sanitizer_API) when available, and falls back to a DOMParser-based approach that removes `<script>`, `<iframe>`, `onerror`/`onclick` inline handlers, and `javascript:` URLs.
+
+> **Migrating from <0.6.0?** The pre-0.6 `cv-html.sanitize` modifier still works (it's now a no-op since sanitization is the default). To restore the old raw behavior on a binding you control, switch `cv-html` → `cv-html.raw`.
 
 ### `cv-once`
 
@@ -2672,7 +2674,7 @@ If you're shipping something with Courvux, [open a PR](https://github.com/vanjex
 
 ## Top-level exports
 
-Everything exported from `'courvux'` (v0.5.3):
+Everything exported from `'courvux'` (v0.6.0):
 
 **App & lifecycle:**
 `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
