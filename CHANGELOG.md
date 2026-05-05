@@ -5,6 +5,30 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.7.1] — 2026-05-05
+
+Patch — `cv-if` no longer destroys and rebuilds the active branch when
+its dependencies fire but the truthy branch hasn't changed. Inputs
+inside `cv-if` / `cv-else` keep their focus and IME state across
+unrelated re-renders.
+
+### Bug fixes
+
+#### `cv-if` rebuilt the same active branch on every dep change → input focus loss
+**File:** `src/dom.ts` — cv-if `render()`
+The previous implementation always called `activeClone.parentNode.removeChild(activeClone)` and re-cloned the matched branch's template at the start of every render pass, even when the same branch was still the truthy one. Templates inside that branch update through their own bindings (interpolations, attribute subscriptions, inner cv-for keyed reconciliation), so the outer remount was wasted work — and worse, it destroyed any `<input>` / `<textarea>` mid-edit, dropping focus and any in-progress IME composition.
+
+Surfaced by the `courvux-tauri-example` notepad: every keystroke mutated `selected.updatedAt` → `notes` notify → computed `selected` recomputed → notify on `selected` → cv-if re-evaluated `!selected`, which stayed false, but the cv-else editor was still re-cloned. Title and body inputs lost focus after one character.
+
+**Fix:** track the active branch index. On re-render, resolve which branch matches now; if the index is unchanged AND a clone is already mounted, leave the DOM untouched and return. Branch flips (truthy → falsy or one cv-else-if → another) still rebuild as before. Interpolations and attribute bindings inside the branch stay reactive through their own subscriptions, so visible content keeps updating without the remount.
+
+### Tests
+- `src/__tests__/cv-if.test.ts` — new regression: mutate a dep of the cv-if condition without flipping branches, assert the same DOM node is reused; flip the branch, assert a new node is rendered.
+- 172 unit (was 171), 10 ssr, 20 ssg.
+- Bundle: 67.0 KB min, 21.7 KB gzip (+0.1 / +0.0 from the index-tracking).
+
+---
+
 ## [0.7.0] — 2026-05-05
 
 Minor — first release that lets apps drop `script-src 'unsafe-eval'` from
