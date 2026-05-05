@@ -129,10 +129,16 @@ export default function courvuxPrecompile(options = {}) {
         // component, just at the cost of needing `unsafe-eval` for those
         // specific expressions.
         async transform(code, id) {
-            // Skip non-source files and the plugin itself.
+            // Skip non-source files and the plugin itself. Also skip
+            // anything that smells like a build output (`/dist/`, `/docs/`,
+            // `/build/`) so we don't try to re-precompile already-bundled
+            // code or Courvux's own internal `template:` field reads. Apps
+            // that genuinely have a `dist/` source folder can override via
+            // the `exclude` option.
             const cleanId = id.split('?')[0];
             if (!/\.(?:js|ts|mjs|mts|jsx|tsx)$/.test(cleanId)) return null;
             if (cleanId.includes('/node_modules/')) return null;
+            if (/\/(?:dist|docs|build|out)\//.test(cleanId)) return null;
             if (!code.includes('template')) return null; // cheap pre-check
 
             const { parse } = await import('acorn');

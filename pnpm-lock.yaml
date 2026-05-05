@@ -13,7 +13,7 @@ importers:
         version: 8.16.0
       courvux-precompiler:
         specifier: github:vanjexdev/courvux-precompiler
-        version: https://codeload.github.com/vanjexdev/courvux-precompiler/tar.gz/c3da9d8eb051699e776c285ff161fcb5a40ce06f
+        version: https://codeload.github.com/vanjexdev/courvux-precompiler/tar.gz/ab3b426e752ab3ee5a98fc258431f867e0bd51b8
       lucide:
         specifier: ^1.11.0
         version: 1.11.0
@@ -895,8 +895,8 @@ packages:
     resolution: {integrity: sha512-kRGRZw3bLlFISDBgwTSA1TMBFN6J6GWDeubmDE3AF+3+yXL8hTWv8r5rkLbqYXY4RjPk/EzHnClI3zQf1cFmHA==}
     engines: {node: '>= 0.6'}
 
-  courvux-precompiler@https://codeload.github.com/vanjexdev/courvux-precompiler/tar.gz/c3da9d8eb051699e776c285ff161fcb5a40ce06f:
-    resolution: {tarball: https://codeload.github.com/vanjexdev/courvux-precompiler/tar.gz/c3da9d8eb051699e776c285ff161fcb5a40ce06f}
+  courvux-precompiler@https://codeload.github.com/vanjexdev/courvux-precompiler/tar.gz/ab3b426e752ab3ee5a98fc258431f867e0bd51b8:
+    resolution: {tarball: https://codeload.github.com/vanjexdev/courvux-precompiler/tar.gz/ab3b426e752ab3ee5a98fc258431f867e0bd51b8}
     version: 0.1.0
     engines: {node: '>=18'}
 
@@ -2266,7 +2266,7 @@ snapshots:
 
   content-disposition@0.5.2: {}
 
-  courvux-precompiler@https://codeload.github.com/vanjexdev/courvux-precompiler/tar.gz/c3da9d8eb051699e776c285ff161fcb5a40ce06f: {}
+  courvux-precompiler@https://codeload.github.com/vanjexdev/courvux-precompiler/tar.gz/ab3b426e752ab3ee5a98fc258431f867e0bd51b8: {}
 
   cross-spawn@7.0.6:
     dependencies:

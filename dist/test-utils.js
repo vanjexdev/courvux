@@ -133,15 +133,20 @@ function subscribeToStore(store, key, cb) {
 
 // src/dom.ts
 var resolve = (expr, state) => expr.split(".").reduce((o, k) => o?.[k], state);
-var evalSupported = (() => {
+var _evalProbed = false;
+var _evalSupported = false;
+var isEvalSupported = () => {
+  if (_evalProbed) return _evalSupported;
+  _evalProbed = true;
   try {
     new Function("return 1")();
-    return true;
+    _evalSupported = true;
   } catch {
-    console.warn("[courvux] CSP blocks eval. Expressions limited to property access and literals.");
-    return false;
+    console.warn("[courvux] CSP blocks eval. Falling back to a limited evaluator that handles property access and literals only. Add `vite-plugin-courvux-precompile` to your build for full template support under strict CSP.");
+    _evalSupported = false;
   }
-})();
+  return _evalSupported;
+};
 var evalCache = /* @__PURE__ */ new Map();
 var handlerCache = /* @__PURE__ */ new Map();
 var compiledExprs = /* @__PURE__ */ new WeakMap();
@@ -149,6 +154,10 @@ var attachCompiledExprs = (state, exprs) => {
   const existing = compiledExprs.get(state);
   if (existing) Object.assign(existing, exprs);
   else compiledExprs.set(state, { ...exprs });
+};
+var inheritCompiledExprs = (childState, parentState) => {
+  const parentExprs = compiledExprs.get(parentState);
+  if (parentExprs) compiledExprs.set(childState, parentExprs);
 };
 var safeEval = (expr, state) => {
   const t = expr.trim();
@@ -169,7 +178,7 @@ var evaluate = (expr, state) => {
     } catch {
     }
   }
-  if (!evalSupported) return safeEval(expr, state);
+  if (!isEvalSupported()) return safeEval(expr, state);
   try {
     let fn = evalCache.get(expr);
     if (!fn) {
@@ -237,7 +246,7 @@ var splitLvalue = (expr) => {
   return result;
 };
 var setStateValue = (expr, state, value) => {
-  if (evalSupported) {
+  if (isEvalSupported()) {
     try {
       const { parent, keyExpr } = splitLvalue(expr);
       const obj = parent ? evaluate(parent, state) : state;
@@ -263,6 +272,7 @@ var makeItemState = (parentState, item, itemVar, index, indexVar) => {
   Object.keys(parentState).forEach((k) => base[k] = parentState[k]);
   base[itemVar] = item;
   if (indexVar) base[indexVar] = index;
+  inheritCompiledExprs(base, parentState);
   return base;
 };
 var resolveClass = (val) => {
@@ -311,7 +321,7 @@ var executeHandler = (expr, state, event) => {
       return;
     }
   }
-  if (!evalSupported) return;
+  if (!isEvalSupported()) return;
   try {
     let fn = handlerCache.get(expr);
     if (!fn) {
@@ -511,9 +521,12 @@ async function walk(el, state, context) {
       if (context.createChildScope) {
         const child = context.createChildScope(childData, childMethods);
         context.registerCleanup?.(child.cleanup);
+        inheritCompiledExprs(child.state, state);
         await walk(element, child.state, { ...context, subscribe: child.subscribe });
       } else {
-        await walk(element, { ...state, ...childData, ...childMethods }, context);
+        const merged = { ...state, ...childData, ...childMethods };
+        inheritCompiledExprs(merged, state);
+        await walk(element, merged, context);
       }
       i++;
       continue;
@@ -607,6 +620,7 @@ async function walk(el, state, context) {
                     return true;
                   }
                 });
+                inheritCompiledExprs(mergedItemState, state);
                 const childCtx = {
                   ...context,
                   subscribe: (key, cb) => {
