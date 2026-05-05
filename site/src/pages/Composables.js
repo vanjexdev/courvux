@@ -73,6 +73,72 @@ onMount() {
     });
     this.$addCleanup(off);
 }`,
+
+        s_define: `import { defineComposable } from 'courvux';
+
+// A composable is a factory that returns a partial component config:
+// data, methods, computed, watch, and lifecycle hooks. Spread the result
+// into a component to share the logic.
+export const useCounter = defineComposable((initial = 0) => ({
+    data: { count: initial },
+    methods: {
+        inc() { this.count++; },
+        reset() { this.count = initial; },
+    },
+}));
+
+// Use it:
+export default {
+    ...useCounter(10),
+    template: \`<button @click="inc()">{{ count }}</button>\`,
+};`,
+
+        s_useMany: `import { useComposables } from 'courvux';
+import { useCounter } from './composables/useCounter.js';
+import { useFlag }    from './composables/useFlag.js';
+
+export default {
+    // Merges data, methods, computed, watch, and hooks from all the
+    // composables into one config. First-writer wins on key collisions
+    // (and a console warning is logged). Hooks run in insertion order.
+    ...useComposables(
+        useCounter(0),
+        useFlag(),
+        // A plain config object also works — useful to add component-only
+        // pieces alongside composables:
+        {
+            methods: {
+                logBoth() { console.log(this.count, this.flag); }
+            }
+        }
+    ),
+    template: \`
+        <div>
+            <p>{{ count }} — {{ flag }}</p>
+            <button @click="inc()">+1</button>
+            <button @click="toggle()">toggle</button>
+        </div>
+    \`,
+};`,
+
+        s_nested: `import { defineComposable, useComposables } from 'courvux';
+
+const useLogger = defineComposable((label) => ({
+    data: { lastLog: '' },
+    methods: { log(msg) { this.lastLog = \`\${label}:\${msg}\`; } },
+}));
+
+// Composables can call other composables. Combine via useComposables and
+// return the merged config — the outer composable is just a normal factory.
+export const useCounter = defineComposable((initial = 0) => useComposables(
+    useLogger('counter'),
+    {
+        data: { count: initial },
+        methods: {
+            inc() { this.count++; this.log(\`now=\${this.count}\`); },
+        },
+    }
+));`,
     },
     template: `
         <div class="prose">
@@ -84,6 +150,8 @@ onMount() {
                     <tr><th>Composable</th><th>Purpose</th></tr>
                 </thead>
                 <tbody>
+                    <tr><td><code>defineComposable(factory)</code></td><td>Author a reusable bundle of data, methods, computed, watch, and hooks</td></tr>
+                    <tr><td><code>useComposables(...composables)</code></td><td>Merge multiple composables into one spreadable config</td></tr>
                     <tr><td><code>cvStorage(key, defaults)</code></td><td>Reactive object backed by <code>localStorage</code></td></tr>
                     <tr><td><code>cvFetch(url, callback, options)</code></td><td>Reactive HTTP fetch with <code>{ data, loading, error }</code></td></tr>
                     <tr><td><code>cvDebounce(fn, ms)</code></td><td>Debounced function preserving <code>this</code></td></tr>
@@ -92,6 +160,22 @@ onMount() {
                     <tr><td><code>cvListener(target, event, handler)</code></td><td>addEventListener returning a cleanup fn</td></tr>
                 </tbody>
             </table>
+
+            <h2>defineComposable — author your own</h2>
+            <p>A composable is a factory that returns a partial component config (<code>data</code>, <code>methods</code>, <code>computed</code>, <code>watch</code>, lifecycle hooks). Spread the result into a component to share the logic without coupling to the global store.</p>
+            <code-block :lang="'js'" :code="s_define"></code-block>
+            <p><code>defineComposable</code> is the identity helper used to mark intent and improve TypeScript inference — at runtime it returns the factory unchanged.</p>
+
+            <h2>useComposables — combine several</h2>
+            <p>To use more than one composable in the same component, wrap them with <code>useComposables(...)</code>. Data, methods, computed, watch, and hooks from every composable are merged into a single config you can spread.</p>
+            <code-block :lang="'js'" :code="s_useMany"></code-block>
+            <div class="callout">
+                <strong>Collision rule:</strong> first writer wins for <code>data</code>, <code>methods</code>, <code>computed</code>, and <code>watch</code> keys. Duplicates log a <code>console.warn</code>. Lifecycle hooks (<code>onMount</code>, <code>onBeforeUnmount</code>, …) all run, in insertion order.
+            </div>
+
+            <h3>Nested composables</h3>
+            <p>Composables are normal functions, so they can call other composables. Combine the results with <code>useComposables</code> and return the merged config:</p>
+            <code-block :lang="'js'" :code="s_nested"></code-block>
 
             <h2>cvStorage — persistent reactive state</h2>
             <p>Every mutation is auto-persisted to <code>localStorage</code>. Survives page reloads.</p>
@@ -129,7 +213,7 @@ onMount() {
     onMount() {
         setHead({
             title: 'Composables',
-            description: 'Reactive composables in Courvux: cvStorage, cvFetch, cvDebounce, cvThrottle, cvMediaQuery, cvListener.',
+            description: 'Author and reuse logic in Courvux with defineComposable + useComposables, plus the built-in cvStorage, cvFetch, cvDebounce, cvThrottle, cvMediaQuery, cvListener helpers.',
             slug: '/composables',
         });
     },

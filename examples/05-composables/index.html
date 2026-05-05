@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Composables — Courvux</title>
+    <style>
+        body {
+            margin: 0; min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            background: #0f1115; color: #e6e6e6;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont;
+        }
+        .card { width: 360px; padding: 32px; border-radius: 12px; background: #181b22; border: 1px solid #232735; }
+        h1 { font-size: 14px; font-weight: 600; margin: 0 0 20px; color: #7d8597; letter-spacing: .08em; text-transform: uppercase; }
+        .row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid #232735; }
+        .row:first-of-type { border-top: 0; }
+        .label { font-size: 12px; color: #7d8597; }
+        .value { font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; }
+        .actions { display: flex; gap: 8px; margin-top: 20px; }
+        button {
+            flex: 1; padding: 8px 12px; font-family: inherit; font-size: 13px; font-weight: 500;
+            background: #232735; color: #e6e6e6; border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+        }
+        button:hover { background: #2c3142; }
+        button.primary { background: #4f7df0; border-color: #4f7df0; }
+        button.primary:hover { background: #5b8af5; }
+        [cv-cloak] { visibility: hidden; }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "courvux": "../../dist/index.js"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div id="app" cv-cloak>
+        <div class="card">
+            <h1>Composables demo</h1>
+            <div class="row">
+                <span class="label">Time</span>
+                <span class="value">{{ now }}</span>
+            </div>
+            <div class="row">
+                <span class="label">Count</span>
+                <span class="value">{{ count }}</span>
+            </div>
+            <div class="row">
+                <span class="label">Status</span>
+                <span class="value">{{ statusLabel }}</span>
+            </div>
+            <div class="actions">
+                <button @click="toggle()">{{ flag ? 'Pause' : 'Resume' }}</button>
+                <button @click="bump()" class="primary" :disabled="!flag">+1 (only when tracking)</button>
+                <button @click="reset()">Reset</button>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>
