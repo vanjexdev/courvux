@@ -5,6 +5,78 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.5.0] — 2026-05-05
+
+Roadmap **Fase 3** — composable authoring API. First minor bump since the 0.4
+line; no breaking changes.
+
+### Added
+
+#### `defineComposable(factory)` — author reusable bundles of component logic
+**File:** `src/composables.ts`
+A composable is a factory that returns a partial component config (`data`,
+`methods`, `computed`, `watch`, lifecycle hooks). `defineComposable` is the
+identity helper used to mark intent and improve TypeScript inference — at
+runtime it returns the factory unchanged. Spread the result into a component
+to share the logic without coupling to the global store:
+
+```js
+import { defineComposable } from 'courvux';
+
+export const useCounter = defineComposable((initial = 0) => ({
+    data: { count: initial },
+    methods: {
+        inc() { this.count++; },
+        reset() { this.count = initial; },
+    },
+}));
+
+export default {
+    ...useCounter(10),
+    template: `<button @click="inc()">{{ count }}</button>`,
+};
+```
+
+#### `useComposables(...composables)` — combine several into one config
+**File:** `src/composables.ts`
+Merges multiple composable configs (or plain config-like objects) into a single
+spreadable config.
+- **First-writer wins** for `data`, `methods`, `computed`, `watch` keys;
+  collisions log a `console.warn`.
+- **Lifecycle hooks** (`onBeforeMount`, `onMount`, `onBeforeUpdate`,
+  `onUpdated`, `onBeforeUnmount`, `onDestroy`) all run, in insertion order.
+- Empty buckets are dropped from the merged result so the spread does not
+  shadow component-level keys.
+
+#### Site self-hosts JetBrains Mono + adds CSP meta
+**Files:** `site/index.html`, `site/src/style.css`, `site/package.json`
+- JetBrains Mono now ships from `@fontsource/jetbrains-mono` (latin subset,
+  weights 400/500/600/700 + 400 italic). No requests to `fonts.googleapis.com`
+  / `fonts.gstatic.com` — privacy + latency win, SRI possible going forward.
+- Added a `Content-Security-Policy` `<meta>` tag. Strict `default-src 'self'`
+  with `'unsafe-eval'` retained temporarily for the runtime template
+  evaluator (slated for removal once the build-time precompiler ships).
+  Restricts `img/font/connect/object/base/form-action/frame-src`.
+- Dropped the three redundant `<link>` tags pointing at the same Google Fonts
+  URL (`preconnect` / `preload` / `stylesheet+onload` + `<noscript>` fallback)
+  and the inline `onload="this.media='all'..."` handler — the only `on*=`
+  inline handler in the document, blocking any CSP without
+  `script-src 'unsafe-inline'`.
+
+### Tests
+- `src/__tests__/define-composable.test.ts` (new, 9 tests): identity
+  helper, single-spread reactivity, hook merge order, collision warn,
+  nested composables, computed + watch buckets.
+- 143 unit (was 134), 10 ssr, 20 ssg.
+- Bundle: 65.4 KB min, 21.2 KB gzip.
+
+### Examples
+- `examples/05-composables/` — `useCounter` + `useFlag` + `useClock` spread
+  into a single component, demonstrates lifecycle inside a composable with
+  `$addCleanup`.
+
+---
+
 ## [0.4.7] — 2026-05-02
 
 ### Bug fixes
