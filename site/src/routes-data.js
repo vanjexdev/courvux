@@ -30,6 +30,7 @@ import Faq             from './pages/Faq.js';
 import MigratingFromVue    from './pages/MigratingFromVue.js';
 import MigratingFromAlpine from './pages/MigratingFromAlpine.js';
 import DemoTodo       from './pages/DemoTodo.js';
+import ProjectNotepad from './pages/projects/Notepad.js';
 
 export default [
     { path: '/',             component: Home },
@@ -55,4 +56,7 @@ export default [
     { path: '/migrating-from-vue',   component: MigratingFromVue },
     { path: '/migrating-from-alpine', component: MigratingFromAlpine },
     { path: '/demo',         component: DemoTodo },
+
+    // Projects — showcase apps built with Courvux. Each lives at /projects/<slug>.
+    { path: '/projects/notepad', component: ProjectNotepad },
 ];
