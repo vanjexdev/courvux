@@ -98,26 +98,35 @@ createApp({
         onColDrop(toCol) {
             if (this.dragId == null) return;
             const id = this.dragId;
-            const fromIdx = this.cards.findIndex(c => c.id === id);
-            if (fromIdx < 0) { this.dragId = null; this.dragFrom = null; return; }
-            this.cards[fromIdx].col = toCol;
-            const [moved] = this.cards.splice(fromIdx, 1);
-            this.cards.push(moved);
+            // $batch coalesces the three cards mutations (col change, splice,
+            // push) into a single notify pass. Without it, each mutation
+            // fires its own notify; the keyed cv-for re-render is async
+            // (await walk inside the add-loop), so three overlapping renders
+            // can race on keyNodeMap and orphan a clone in the DOM —
+            // visible as a duplicated card.
+            this.$batch(() => {
+                const fromIdx = this.cards.findIndex(c => c.id === id);
+                if (fromIdx < 0) return;
+                this.cards[fromIdx].col = toCol;
+                const [moved] = this.cards.splice(fromIdx, 1);
+                this.cards.push(moved);
+            });
             this.dragId = null; this.dragFrom = null;
         },
         onCardDrop(targetId, ev) {
             ev.stopPropagation();
             if (this.dragId == null || this.dragId === targetId) return;
             const id = this.dragId;
-            const fromIdx = this.cards.findIndex(c => c.id === id);
-            const targetIdx = this.cards.findIndex(c => c.id === targetId);
-            if (fromIdx < 0 || targetIdx < 0) { this.dragId = null; this.dragFrom = null; return; }
-            const targetCol = this.cards[targetIdx].col;
-            this.cards[fromIdx].col = targetCol;
-            const [moved] = this.cards.splice(fromIdx, 1);
-            // Target's index may have shifted left if it sat after the removed row.
-            const insertAt = this.cards.findIndex(c => c.id === targetId);
-            this.cards.splice(insertAt, 0, moved);
+            this.$batch(() => {
+                const fromIdx = this.cards.findIndex(c => c.id === id);
+                const targetIdx = this.cards.findIndex(c => c.id === targetId);
+                if (fromIdx < 0 || targetIdx < 0) return;
+                const targetCol = this.cards[targetIdx].col;
+                this.cards[fromIdx].col = targetCol;
+                const [moved] = this.cards.splice(fromIdx, 1);
+                const insertAt = this.cards.findIndex(c => c.id === targetId);
+                this.cards.splice(insertAt, 0, moved);
+            });
             this.dragId = null; this.dragFrom = null;
         },
         clearAll() {
