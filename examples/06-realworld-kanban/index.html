@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kanban — Courvux</title>
+    <style>
+        :root {
+            --bg: #0f1115; --panel: #181b22; --panel-2: #1f2330; --border: #232735;
+            --text: #e6e6e6; --muted: #7d8597; --accent: #4f7df0; --danger: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont;
+            padding: 32px; user-select: none;
+        }
+        header { display: flex; align-items: center; justify-content: space-between; max-width: 1200px; margin: 0 auto 28px; }
+        header h1 { font-size: 18px; font-weight: 600; margin: 0; letter-spacing: .04em; }
+        header .clear {
+            background: transparent; border: 1px solid var(--border); color: var(--muted);
+            padding: 6px 14px; font-size: 12px; border-radius: 6px; cursor: pointer; font-family: inherit;
+        }
+        header .clear:hover { color: var(--danger); border-color: var(--danger); }
+        .board {
+            max-width: 1200px; margin: 0 auto;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+        }
+        .col {
+            background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+            padding: 16px; display: flex; flex-direction: column; min-height: 60vh;
+        }
+        .col.is-drop { border-color: var(--accent); background: #1d2230; }
+        .col h2 {
+            font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted);
+            margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .col .count {
+            background: var(--panel-2); color: var(--text); font-size: 10px; padding: 2px 8px; border-radius: 10px;
+            font-weight: 500; letter-spacing: 0;
+        }
+        .cards { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+        .card {
+            background: var(--panel-2); border: 1px solid transparent; border-radius: 6px;
+            padding: 10px 12px; font-size: 13px; line-height: 1.5; cursor: grab; user-select: text;
+            display: flex; align-items: flex-start; gap: 8px; transition: border-color .15s, opacity .15s;
+        }
+        .card:hover { border-color: var(--border); }
+        .card.is-dragging { opacity: .35; cursor: grabbing; }
+        .card .text { flex: 1; word-break: break-word; }
+        .card .del {
+            background: transparent; border: none; color: var(--muted); font-size: 14px; line-height: 1;
+            cursor: pointer; padding: 0; opacity: 0; transition: opacity .15s, color .15s;
+        }
+        .card:hover .del { opacity: 1; }
+        .card .del:hover { color: var(--danger); }
+        .card input.edit {
+            flex: 1; background: transparent; border: none; color: var(--text); font-family: inherit;
+            font-size: 13px; padding: 0; outline: none;
+        }
+        .draft {
+            margin-top: 8px; display: flex; gap: 6px;
+        }
+        .draft input {
+            flex: 1; background: var(--panel-2); border: 1px solid transparent; border-radius: 6px;
+            color: var(--text); font-family: inherit; font-size: 13px; padding: 8px 10px; outline: none;
+        }
+        .draft input:focus { border-color: var(--accent); }
+        .draft button {
+            background: var(--accent); color: white; border: none; border-radius: 6px;
+            padding: 0 14px; font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 500;
+        }
+        .draft button:disabled { opacity: .4; cursor: not-allowed; }
+        [cv-cloak] { visibility: hidden; }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "courvux": "../../dist/index.js"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div id="app" cv-cloak>
+        <header>
+            <h1>⚡ Courvux Kanban</h1>
+            <button class="clear" @click="clearAll()">Clear all</button>
+        </header>
+
+        <div class="board">
+            <div cv-for="col in columns"
+                 :key="col.key"
+                 class="col"
+                 :class="{ 'is-drop': dragId !== null && dragFrom !== col.key }"
+                 @dragover="onColDragOver($event)"
+                 @drop="onColDrop(col.key)">
+
+                <h2>
+                    <span>{{ col.title }}</span>
+                    <span class="count">{{ cardsByColumn[col.key].length }}</span>
+                </h2>
+
+                <div class="cards">
+                    <div cv-for="card in cardsByColumn[col.key]"
+                         :key="card.id"
+                         class="card"
+                         :class="{ 'is-dragging': dragId === card.id }"
+                         draggable="true"
+                         @dragstart="onDragStart(card.id, col.key, $event)"
+                         @dragend="onDragEnd()"
+                         @dragover="onColDragOver($event)"
+                         @drop="onCardDrop(card.id, $event)"
+                         @dblclick="startEdit(card.id)">
+
+                        <input cv-if="editingId === card.id"
+                               class="edit"
+                               cv-focus
+                               :value="card.text"
+                               @keydown.enter="commitEdit(card.id, $event)"
+                               @blur="commitEdit(card.id, $event)" />
+                        <span cv-else class="text">{{ card.text }}</span>
+
+                        <button cv-if="editingId !== card.id"
+                                class="del"
+                                @click="removeCard(card.id)">✕</button>
+                    </div>
+                </div>
+
+                <form class="draft" @submit.prevent="addCard(col.key)">
+                    <input type="text"
+                           cv-model="draft[col.key]"
+                           placeholder="Add a card…" />
+                    <button type="submit" :disabled="!draft[col.key].trim()">+</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

@@ -5,6 +5,117 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.5.3] — 2026-05-05
+
+Patch — finishes the `cv-model` write-side fix from 0.5.2.
+
+### Bug fixes
+
+#### `cv-model` bracket notation broke when the dynamic key came from a `cv-for` iteration variable
+**File:** `src/dom.ts` — `setStateValue`
+The 0.5.2 implementation compiled `with(__s__){ (${expr}) = __v__ }`. That
+worked at top level but silently wrote `undefined` whenever the `state`
+passed in was the per-iteration `mergedItemState` proxy used by `cv-for`,
+because the proxy's catch-all `has` trap (returns `true` for every
+identifier so reads can fall through to the parent state) ALSO captured the
+function's `__v__` parameter. `__v__` resolved to `state.__v__` inside the
+`with`, which is `undefined`. Surfaced by the kanban "Add a card" inputs
+once 0.5.2 enabled the read+write asymmetry: button enabled because the
+input's typed character briefly hit state, then the next render read it
+back as `undefined` and cleared the field.
+**Fix:** stop using `with(...)` for the assignment. Split the expression
+into a parent expression and a final key (`draft[col.key]` →
+`{ parent: 'draft', keyExpr: 'col.key' }`), evaluate both via the existing
+`evaluate()` (which uses `with(state)` only for reads, where the value
+parameter doesn't exist), then assign `obj[key] = value` in plain scope —
+no with, no shadowing. The split is cached per expression.
+
+### Tests
+- `src/__tests__/cv-model.test.ts` — new regression covering bracket
+  notation keyed by a `cv-for` iteration variable (two inputs in two
+  iterations, each writes back to the right key).
+- 148 unit (was 147), 10 ssr, 20 ssg.
+- Bundle: 66.2 KB min, 21.5 KB gzip (+0.4 KB / +0.2 KB from the lvalue
+  splitter + cache).
+
+---
+
+## [0.5.2] — 2026-05-05
+
+Patch — `cv-model` write side now matches the read side's expressivity.
+
+### Bug fixes
+
+#### `cv-model` silently dropped updates with bracket notation
+**File:** `src/dom.ts` — `setStateValue`
+The read side of `cv-model` (and any other place that called `evaluate`)
+already accepted any assignable expression — `form[key]`, `draft[col.key]`,
+deep dot chains — because it goes through the `new Function` evaluator.
+The write side, `setStateValue`, parsed the expression as a literal dot
+path: `expr.split('.')`. So `cv-model="draft[col.key]"` rendered the
+correct value but every keystroke was silently swallowed: input "live but
+disconnected." Surfaced by the kanban example's per-column "Add a card"
+form (one input per iteration of `cv-for="col in columns"`).
+**Fix:** `setStateValue` now compiles a `new Function('__s__', '__v__',
+\`with(__s__){ (${expr}) = __v__ }\`)` writer (cached per expression) when
+the runtime supports `eval`, identical to how `evaluate` reads. The
+existing dot-path code stays as the CSP-strict fallback — that path was
+already the only thing strict-CSP apps had, so nothing regresses.
+
+### Tests
+- `src/__tests__/cv-model.test.ts` — three new regressions: bracket
+  notation with literal key, bracket notation with dynamic key from
+  state, deep dot path.
+- 147 unit (was 144), 10 ssr, 20 ssg.
+- Bundle: 65.8 KB min, 21.3 KB gzip (+0.2 KB / +0.0 KB from the cache
+  + writer compile).
+
+---
+
+## [0.5.1] — 2026-05-05
+
+Patch — race-condition fix in `cv-for` keyed reconciliation, exposed by the new
+kanban example, plus the docs that surround the same gotcha.
+
+### Bug fixes
+
+#### `cv-for :key` could orphan a clone in the DOM under rapid mutations
+**File:** `src/dom.ts`
+The keyed `cv-for` `render()` is async — it `await`s `walk()` for every newly
+cloned row. Three rapid mutations to the same array (the kanban drop handler:
+property change → `splice` → `push`) fire three `notifyKey('items')` calls,
+each scheduling its own `render()`. With nothing serializing them, a later
+render could enter the diff loop while an earlier one was still suspended at
+`await walk` for the same new key — both ended up creating a clone, both got
+attached to the DOM, but only one was tracked in `keyNodeMap`. The orphan
+stayed visible as a duplicated row.
+**Fix:** wrap the keyed `render()` in a per-instance serializer (`renderInflight`
++ `renderPending`). If a new notification arrives while a render is in flight,
+mark a single follow-up as pending; after the current render finishes, drain
+the pending flag with one extra render against the latest state. Many
+coalesced notifications collapse to at most one extra render — which is the
+whole point.
+
+### Tests
+- `src/__tests__/cv-for-keyed.test.ts` — new regression covering three rapid
+  mutations to the same keyed array in a single tick.
+- 144 unit (was 143), 10 ssr, 20 ssg.
+- Bundle: 65.6 KB min, 21.3 KB gzip (+0.2 KB / +0.1 KB from the serializer).
+
+### Docs
+- `/reactivity` adds a "Common gotchas" section covering the proxy-identity
+  pitfall (`findIndex` vs `indexOf`) and the rapid-mutation pattern (when
+  `$batch` is the right tool).
+- `/faq` adds the "drag-and-drop deletes the wrong row" question pointing at
+  the same fix.
+
+### Examples
+- `examples/06-realworld-kanban/` keeps `$batch` in its drop handlers, but
+  now framed as a performance choice (one re-render instead of three) rather
+  than a correctness workaround.
+
+---
+
 ## [0.5.0] — 2026-05-05
 
 Roadmap **Fase 3** — composable authoring API. First minor bump since the 0.4

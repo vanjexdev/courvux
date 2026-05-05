@@ -111,6 +111,30 @@ provide() {
         config: readonly(this.appConfig),
     };
 }`,
+
+        s_proxyId: `// ❌ Pitfall — proxy identity is per-access
+const card = this.cards.find(c => c.id === this.dragId);
+const idx  = this.cards.indexOf(card);   // -1 — different proxy wrapper!
+this.cards.splice(idx, 1);                // splice(-1, 1) deletes the LAST row
+
+// ✅ Always look items up by primitive id, never by proxy reference
+const idx = this.cards.findIndex(c => c.id === this.dragId);
+this.cards.splice(idx, 1);
+
+// ✅ Or unwrap with toRaw if you really need identity
+import { toRaw } from 'courvux';
+const raw = toRaw(card);
+this.cards.indexOf(raw);   // works, but findIndex is usually clearer`,
+
+        s_batchHot: `// Three rapid mutations to the same array key — drop handler in a kanban
+// board, swap rows in a table, etc. Each one schedules its own re-render.
+// Wrap in $batch so cv-for re-renders once with the final state instead of
+// three times.
+this.$batch(() => {
+    this.rows[fromIdx].col = toCol;
+    const [moved] = this.rows.splice(fromIdx, 1);
+    this.rows.push(moved);
+});`,
     },
     template: `
         <div class="prose">
@@ -167,6 +191,19 @@ provide() {
 
             <div class="callout info">
                 Native built-ins like <code>Date</code>, <code>Map</code>, <code>Set</code>, <code>RegExp</code>, and typed arrays are automatically skipped from Proxy wrapping — you don't need <code>markRaw</code> for them.
+            </div>
+
+            <h2>Common gotchas</h2>
+
+            <h3>Proxy identity — prefer <code>findIndex</code> over <code>indexOf</code></h3>
+            <p>Courvux wraps each property access in a fresh Proxy, so the object you get from <code>.find()</code> is not <code>===</code> to the same row when read again from the array. <code>indexOf(proxy)</code> returns <code>-1</code>, and <code>splice(-1, 1)</code> silently deletes the last row instead of the one you meant. Look items up by their primitive id with <code>findIndex</code>:</p>
+            <code-block :lang="'js'" :code="s_proxyId"></code-block>
+
+            <h3>Hot-path mutations — wrap in <code>$batch</code></h3>
+            <p>If you do three or more rapid mutations to the same array (drag-and-drop, bulk edits, etc.), each one schedules its own re-render. Wrapping the sequence in <code>$batch</code> coalesces them into a single render with the final state — usually a noticeable speedup, and it sidesteps any chance of intermediate states being painted.</p>
+            <code-block :lang="'js'" :code="s_batchHot"></code-block>
+            <div class="callout info">
+                Since 0.5.1, <code>cv-for</code> with <code>:key</code> serializes overlapping renders internally, so even without <code>$batch</code> the DOM stays correct. <code>$batch</code> is now a pure performance lever for these patterns, not a correctness requirement.
             </div>
 
             <div style="margin-top:2rem; display:flex; gap:12px;">

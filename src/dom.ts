@@ -88,7 +88,78 @@ export const subscribeDeps = (expr: string, context: WalkContext, cb: Function):
     return () => unsubs.forEach(u => u());
 };
 
+// Cache parsed lvalue splits so cv-model on the same path doesn't re-walk the
+// expression on every keystroke. Each entry is { parent, keyExpr }.
+const lvalueCache = new Map<string, { parent: string; keyExpr: string }>();
+
+// Split an assignable expression into the parent expression and the final
+// member access. `draft[col.key]` → { parent: 'draft', keyExpr: 'col.key' }.
+// `user.profile.name`            → { parent: 'user.profile', keyExpr: '"name"' }.
+// `name`                         → { parent: '', keyExpr: '"name"' }.
+// We do this so the assignment can run OUTSIDE any `with(state)` scope —
+// otherwise the value parameter would be captured by the proxy's catch-all
+// `has` trap and resolve to undefined.
+const splitLvalue = (expr: string): { parent: string; keyExpr: string } => {
+    const cached = lvalueCache.get(expr);
+    if (cached) return cached;
+
+    const t = expr.trim();
+    let depth = 0;
+    let lastIdx = -1;
+    let lastKind: 'dot' | 'bracket' | null = null;
+
+    for (let i = 0; i < t.length; i++) {
+        const c = t[i];
+        if (c === '[') {
+            if (depth === 0) { lastIdx = i; lastKind = 'bracket'; }
+            depth++;
+        } else if (c === ']') {
+            depth--;
+        } else if (c === '.' && depth === 0) {
+            lastIdx = i; lastKind = 'dot';
+        }
+    }
+
+    let result: { parent: string; keyExpr: string };
+    if (lastIdx < 0) {
+        result = { parent: '', keyExpr: JSON.stringify(t) };
+    } else if (lastKind === 'dot') {
+        result = { parent: t.slice(0, lastIdx), keyExpr: JSON.stringify(t.slice(lastIdx + 1)) };
+    } else {
+        const closing = t.lastIndexOf(']');
+        result = closing > lastIdx
+            ? { parent: t.slice(0, lastIdx), keyExpr: t.slice(lastIdx + 1, closing) }
+            : { parent: '', keyExpr: JSON.stringify(t) }; // malformed → treat as bare
+    }
+    lvalueCache.set(expr, result);
+    return result;
+};
+
 export const setStateValue = (expr: string, state: any, value: any) => {
+    // The read side of cv-model goes through `evaluate()`, which compiles
+    // `with(state) { return (expr) }` and handles any readable expression
+    // (bracket notation with dynamic keys, deep dot paths, etc.). Before
+    // this rewrite the write side did `expr.split('.')`, so anything but a
+    // dot path was silently dropped — the input "looked live but
+    // disconnected." We now mirror evaluate's expressivity by splitting the
+    // lvalue into parent + key, evaluating each through evaluate(), then
+    // assigning outside any `with(...)` scope.
+    if (evalSupported) {
+        try {
+            const { parent, keyExpr } = splitLvalue(expr);
+            const obj = parent ? evaluate(parent, state) : state;
+            const key = evaluate(keyExpr, state);
+            if (obj == null) return;
+            obj[key] = value;
+            return;
+        } catch (e) {
+            console.warn(`[courvux] setStateValue: write failed for "${expr}":`, e);
+            return;
+        }
+    }
+    // CSP-strict fallback (no `unsafe-eval`): only supports dot paths. Bracket
+    // notation and dynamic keys are unreachable here — they were unreachable
+    // before this patch too, so nothing regresses.
     const parts = expr.split('.');
     if (parts.length === 1) {
         state[parts[0]] = value;
@@ -375,7 +446,18 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 // reactive holds per-item reactive state so targeted updates are possible
                 const keyNodeMap = new Map<any, { el: HTMLElement; reactive: any; itemRef: any; destroy: () => void }>();
 
-                const render = async () => {
+                // Serialize render() per cv-for instance. The body awaits walk()
+                // for every newly cloned row, so multiple notifyKey() calls
+                // arriving while a render is still suspended would otherwise
+                // race on `keyNodeMap` and orphan a clone in the DOM (the
+                // first render's set() runs after the second render's
+                // diff-against-old-map decision, so the second render also
+                // adds a clone for the same key — both end up attached but
+                // only one is tracked). See examples/06-realworld-kanban for a
+                // real-world repro before this guard existed.
+                let renderInflight = false;
+                let renderPending = false;
+                const renderImpl = async () => {
                     const collection = evaluate(collectionExpr, state);
                     const entries: [any, any][] = !collection ? [] :
                         typeof collection === 'number'
@@ -565,6 +647,25 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                             parent.insertBefore(tempFrag, insertBefore);
                             rendered.push(actualEl);
                         }
+                    }
+                };
+
+                const render = async () => {
+                    if (renderInflight) { renderPending = true; return; }
+                    renderInflight = true;
+                    try {
+                        await renderImpl();
+                        // Drain coalesced notifications: every notify that
+                        // arrived while we were suspended set renderPending.
+                        // We only need a single follow-up render against the
+                        // latest state to catch up — collapsing many missed
+                        // notifies into one re-render is the whole point.
+                        while (renderPending) {
+                            renderPending = false;
+                            await renderImpl();
+                        }
+                    } finally {
+                        renderInflight = false;
                     }
                 };
 
