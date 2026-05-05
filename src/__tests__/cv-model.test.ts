@@ -110,4 +110,33 @@ describe('cv-model', () => {
         expect((w.state as any).user.profile.name).toBe('Grace');
         w.destroy();
     });
+
+    // Kanban repro: cv-model with bracket notation, where the dynamic key is
+    // the iteration variable of the surrounding cv-for. The state passed to
+    // setStateValue is the per-iteration mergedItemState proxy, not the raw
+    // component state — `col` resolves through the proxy fall-through.
+    it('writes back to bracket notation keyed by a cv-for iteration variable', async () => {
+        const w = await mount({
+            template: `
+                <div>
+                    <div cv-for="col in cols" :key="col.key">
+                        <input cv-model="draft[col.key]" />
+                    </div>
+                </div>
+            `,
+            data: {
+                cols: [{ key: 'a' }, { key: 'b' }],
+                draft: { a: '', b: '' },
+            }
+        });
+        const inputs = w.findAll('input') as HTMLInputElement[];
+        expect(inputs).toHaveLength(2);
+        inputs[0].value = 'hello';
+        await w.trigger(inputs[0], 'input');
+        expect((w.state as any).draft.a).toBe('hello');
+        inputs[1].value = 'world';
+        await w.trigger(inputs[1], 'input');
+        expect((w.state as any).draft.b).toBe('world');
+        w.destroy();
+    });
 });
