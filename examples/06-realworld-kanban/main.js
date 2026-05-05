@@ -99,11 +99,10 @@ createApp({
             if (this.dragId == null) return;
             const id = this.dragId;
             // $batch coalesces the three cards mutations (col change, splice,
-            // push) into a single notify pass. Without it, each mutation
-            // fires its own notify; the keyed cv-for re-render is async
-            // (await walk inside the add-loop), so three overlapping renders
-            // can race on keyNodeMap and orphan a clone in the DOM —
-            // visible as a duplicated card.
+            // push) so cv-for re-renders once instead of three times. Pure
+            // performance — Courvux 0.5.1+ also serializes overlapping
+            // renders inside cv-for, so even without $batch the DOM stays
+            // correct, just at the cost of redundant work per drop.
             this.$batch(() => {
                 const fromIdx = this.cards.findIndex(c => c.id === id);
                 if (fromIdx < 0) return;

@@ -375,7 +375,18 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 // reactive holds per-item reactive state so targeted updates are possible
                 const keyNodeMap = new Map<any, { el: HTMLElement; reactive: any; itemRef: any; destroy: () => void }>();
 
-                const render = async () => {
+                // Serialize render() per cv-for instance. The body awaits walk()
+                // for every newly cloned row, so multiple notifyKey() calls
+                // arriving while a render is still suspended would otherwise
+                // race on `keyNodeMap` and orphan a clone in the DOM (the
+                // first render's set() runs after the second render's
+                // diff-against-old-map decision, so the second render also
+                // adds a clone for the same key — both end up attached but
+                // only one is tracked). See examples/06-realworld-kanban for a
+                // real-world repro before this guard existed.
+                let renderInflight = false;
+                let renderPending = false;
+                const renderImpl = async () => {
                     const collection = evaluate(collectionExpr, state);
                     const entries: [any, any][] = !collection ? [] :
                         typeof collection === 'number'
@@ -565,6 +576,25 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                             parent.insertBefore(tempFrag, insertBefore);
                             rendered.push(actualEl);
                         }
+                    }
+                };
+
+                const render = async () => {
+                    if (renderInflight) { renderPending = true; return; }
+                    renderInflight = true;
+                    try {
+                        await renderImpl();
+                        // Drain coalesced notifications: every notify that
+                        // arrived while we were suspended set renderPending.
+                        // We only need a single follow-up render against the
+                        // latest state to catch up — collapsing many missed
+                        // notifies into one re-render is the whole point.
+                        while (renderPending) {
+                            renderPending = false;
+                            await renderImpl();
+                        }
+                    } finally {
+                        renderInflight = false;
                     }
                 };
 

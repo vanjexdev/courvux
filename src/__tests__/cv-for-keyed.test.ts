@@ -89,4 +89,35 @@ describe('cv-for with :key — keyed reconciliation', () => {
         expect(lis[1].textContent?.trim()).toBe('1:A');
         w.destroy();
     });
+
+    it('does not duplicate nodes when the same array mutates 3+ times in one tick', async () => {
+        // Regression for the kanban-style race: each notifyKey fires its own
+        // render(), and render() awaits walk() per new clone, so without
+        // serialization a third notify can re-create a clone for a key whose
+        // previous clone is still mid-await — both end up in the DOM but only
+        // one is tracked in keyNodeMap, leaving an orphan.
+        const w = await mount({
+            template: '<ul><li cv-for="item in items" :key="item.id">{{ item.label }}</li></ul>',
+            data: { items: [{ id: 1, label: 'A' }, { id: 2, label: 'B' }] }
+        });
+
+        // Three rapid mutations in the same synchronous turn — the same
+        // pattern the kanban drop handler uses (col change, splice, push).
+        // Use indexed mutations to mimic property writes that fire root-key
+        // notifies on the array.
+        const items = w.state.items as any[];
+        items[1].label = 'B-edited';   // notify #1
+        items.splice(1, 1);            // notify #2 — removes B
+        items.push({ id: 2, label: 'B-edited' }); // notify #3 — re-adds B
+
+        await w.nextTick();
+        // Drain any scheduled follow-up renders that the serializer queued.
+        await w.nextTick();
+
+        const lis = w.findAll('li');
+        expect(lis).toHaveLength(2);
+        const ids = lis.map(li => li.textContent?.trim());
+        expect(ids).toEqual(['A', 'B-edited']);
+        w.destroy();
+    });
 });

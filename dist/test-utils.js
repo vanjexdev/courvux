@@ -450,7 +450,9 @@ async function walk(el, state, context) {
         let rendered = [];
         let itemUnsubs = [];
         const keyNodeMap = /* @__PURE__ */ new Map();
-        const render = async () => {
+        let renderInflight = false;
+        let renderPending = false;
+        const renderImpl = async () => {
           const collection = evaluate(collectionExpr, state);
           const entries = !collection ? [] : typeof collection === "number" ? Array.from({ length: collection }, (_, i2) => [i2 + 1, i2]) : Array.isArray(collection) ? collection.map((v, idx) => [v, idx]) : Object.entries(collection).map(([k, v]) => [v, k]);
           if (keyExpr) {
@@ -612,6 +614,22 @@ async function walk(el, state, context) {
               parent.insertBefore(tempFrag, insertBefore);
               rendered.push(actualEl);
             }
+          }
+        };
+        const render = async () => {
+          if (renderInflight) {
+            renderPending = true;
+            return;
+          }
+          renderInflight = true;
+          try {
+            await renderImpl();
+            while (renderPending) {
+              renderPending = false;
+              await renderImpl();
+            }
+          } finally {
+            renderInflight = false;
           }
         };
         context.registerCleanup?.(() => {

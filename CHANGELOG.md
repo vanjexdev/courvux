@@ -5,6 +5,50 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.5.1] — 2026-05-05
+
+Patch — race-condition fix in `cv-for` keyed reconciliation, exposed by the new
+kanban example, plus the docs that surround the same gotcha.
+
+### Bug fixes
+
+#### `cv-for :key` could orphan a clone in the DOM under rapid mutations
+**File:** `src/dom.ts`
+The keyed `cv-for` `render()` is async — it `await`s `walk()` for every newly
+cloned row. Three rapid mutations to the same array (the kanban drop handler:
+property change → `splice` → `push`) fire three `notifyKey('items')` calls,
+each scheduling its own `render()`. With nothing serializing them, a later
+render could enter the diff loop while an earlier one was still suspended at
+`await walk` for the same new key — both ended up creating a clone, both got
+attached to the DOM, but only one was tracked in `keyNodeMap`. The orphan
+stayed visible as a duplicated row.
+**Fix:** wrap the keyed `render()` in a per-instance serializer (`renderInflight`
++ `renderPending`). If a new notification arrives while a render is in flight,
+mark a single follow-up as pending; after the current render finishes, drain
+the pending flag with one extra render against the latest state. Many
+coalesced notifications collapse to at most one extra render — which is the
+whole point.
+
+### Tests
+- `src/__tests__/cv-for-keyed.test.ts` — new regression covering three rapid
+  mutations to the same keyed array in a single tick.
+- 144 unit (was 143), 10 ssr, 20 ssg.
+- Bundle: 65.6 KB min, 21.3 KB gzip (+0.2 KB / +0.1 KB from the serializer).
+
+### Docs
+- `/reactivity` adds a "Common gotchas" section covering the proxy-identity
+  pitfall (`findIndex` vs `indexOf`) and the rapid-mutation pattern (when
+  `$batch` is the right tool).
+- `/faq` adds the "drag-and-drop deletes the wrong row" question pointing at
+  the same fix.
+
+### Examples
+- `examples/06-realworld-kanban/` keeps `$batch` in its drop handlers, but
+  now framed as a performance choice (one re-render instead of three) rather
+  than a correctness workaround.
+
+---
+
 ## [0.5.0] — 2026-05-05
 
 Roadmap **Fase 3** — composable authoring API. First minor bump since the 0.4
