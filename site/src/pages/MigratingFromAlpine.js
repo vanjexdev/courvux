@@ -85,7 +85,7 @@ autoInit({ globalProperties: { $store: store } });
                     <tr><td><code>x-for + :key</code></td><td><code>cv-for + :key</code> (same)</td></tr>
                     <tr><td><code>x-model</code></td><td><code>cv-model</code></td></tr>
                     <tr><td><code>x-model.lazy</code> / <code>.number</code></td><td><code>cv-model.lazy</code> / <code>.number</code> / <code>.trim</code> / <code>.debounce</code></td></tr>
-                    <tr><td><code>x-html="..."</code></td><td><code>cv-html</code> (also <code>cv-html.sanitize</code>)</td></tr>
+                    <tr><td><code>x-html="..."</code></td><td><code>cv-html.raw</code> for trusted markup; bare <code>cv-html</code> sanitizes by default (safer than Alpine's default)</td></tr>
                     <tr><td><code>x-ref="el"</code></td><td><code>cv-ref="el"</code> (plus dynamic <code>:cv-ref="'foo_'+id"</code>)</td></tr>
                     <tr><td><code>x-cloak</code></td><td><code>cv-cloak</code> (auto-injects the hide CSS for you)</td></tr>
                     <tr><td><code>x-on:click</code> / <code>@click</code></td><td><code>cv:on:click</code> / <code>@click</code></td></tr>

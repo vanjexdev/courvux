@@ -978,13 +978,18 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             }
         }
 
-        // cv-html [.sanitize] — set innerHTML; add .sanitize modifier to strip XSS vectors
+        // cv-html — innerHTML, sanitized by default (strips <script>, on*= handlers,
+        // javascript: URIs, and other XSS vectors). Add `.raw` to opt out when the
+        // markup is trusted (e.g. content you authored, Markdown rendered server-side).
+        // The legacy `.sanitize` modifier from <0.6 still works as a no-op so older
+        // templates do not silently change behavior.
         {
             const htmlAttr = Array.from(element.attributes).find(a => a.name === 'cv-html' || a.name.startsWith('cv-html.'));
             if (htmlAttr) {
                 const expr = htmlAttr.value;
                 element.removeAttribute(htmlAttr.name);
-                const doSanitize = htmlAttr.name.split('.').slice(1).includes('sanitize');
+                const mods = htmlAttr.name.split('.').slice(1);
+                const doSanitize = !mods.includes('raw');
                 const update = () => {
                     const raw = String(evaluate(expr, state) ?? '');
                     element.innerHTML = doSanitize ? sanitizeHtml(raw) : raw;

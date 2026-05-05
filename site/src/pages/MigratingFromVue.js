@@ -99,7 +99,7 @@ this.$store.addToCart(product);`,
                     <tr><td><code>v-show</code></td><td><code>cv-show</code></td></tr>
                     <tr><td><code>v-model</code></td><td><code>cv-model</code></td></tr>
                     <tr><td><code>v-model.lazy</code> / <code>.trim</code> / <code>.number</code></td><td><code>cv-model.lazy</code> / <code>.trim</code> / <code>.number</code> (same)</td></tr>
-                    <tr><td><code>v-html</code></td><td><code>cv-html</code> (also <code>cv-html.sanitize</code>)</td></tr>
+                    <tr><td><code>v-html</code></td><td><code>cv-html.raw</code> for trusted markup; bare <code>cv-html</code> sanitizes by default (safer than Vue's default)</td></tr>
                     <tr><td><code>v-once</code></td><td><code>cv-once</code></td></tr>
                     <tr><td><code>:prop</code></td><td><code>:prop</code> (identical)</td></tr>
                     <tr><td><code>@click</code> / <code>@event.modifier</code></td><td><code>@click</code> / <code>@event.modifier</code> (identical)</td></tr>
