@@ -21,7 +21,7 @@ All paths below are relative to the repo root (`vanjexdev/courvux`).
 | Examples | `examples/` |
 | Changelog | `CHANGELOG.md` |
 | Benchmarks | `BENCHMARKS.md` |
-| Current version | **0.6.0** |
+| Current version | **0.7.0** |
 | Repo | `https://github.com/vanjexdev/courvux` |
 | Live docs | `https://vanjexdev.github.io/courvux/` |
 
@@ -517,7 +517,7 @@ Only **top-level** `[cv-data]` elements are walked — nested ones are handled b
 
 ---
 
-## Top-level exports (v0.6.0)
+## Top-level exports (v0.7.0)
 
 **App**: `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`
 **Router/Store**: `createRouter`, `createStore`
@@ -527,8 +527,9 @@ Only **top-level** `[cv-data]` elements are walked — nested ones are handled b
 **DevTools**: `setupDevTools`, `mountDevOverlay`
 **SEO**: `useHead`
 **SSR/SSG**: `renderToString`, `renderPage`, `renderHeadToString`, `SSR_ATTR`
+**Precompile registry**: `attachCompiledExprs(state, exprs)` — wired automatically by mount() when `config.exprs` exists; rarely called by hand.
 
-**Subpath exports**: `'courvux'`, `'courvux/test-utils'`, `'courvux/plugin'`, `'courvux/plugin/ssg'`.
+**Subpath exports**: `'courvux'`, `'courvux/test-utils'`, `'courvux/plugin'`, `'courvux/plugin/ssg'`, `'courvux/plugin/precompile'` (build-time expression compiler — see `/csp` page).
 
 ---
 

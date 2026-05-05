@@ -23,6 +23,7 @@ import Ssg            from './pages/Ssg.js';
 import DevTools       from './pages/DevTools.js';
 import Testing        from './pages/Testing.js';
 import Pwa            from './pages/Pwa.js';
+import Csp            from './pages/Csp.js';
 import Advanced       from './pages/Advanced.js';
 import DesignDecisions from './pages/DesignDecisions.js';
 import Faq             from './pages/Faq.js';
@@ -47,6 +48,7 @@ export default [
     { path: '/devtools',     component: DevTools },
     { path: '/testing',      component: Testing },
     { path: '/pwa',          component: Pwa },
+    { path: '/csp',          component: Csp },
     { path: '/advanced',     component: Advanced },
     { path: '/design-decisions',     component: DesignDecisions },
     { path: '/faq',                  component: Faq },

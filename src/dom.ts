@@ -26,13 +26,67 @@ export interface WalkContext {
 export const resolve = (expr: string, state: any): any =>
     expr.split('.').reduce((o: any, k) => o?.[k], state);
 
-const evalSupported = (() => {
-    try { new Function('return 1')(); return true; }
-    catch { console.warn('[courvux] CSP blocks eval. Expressions limited to property access and literals.'); return false; }
-})();
+// Lazy CSP probe. The previous implementation evaluated `new Function('return 1')()`
+// at module-init time so the rest of the runtime could branch on a constant,
+// but that triggered a `script-src 'unsafe-eval'` CSP violation in every
+// strict-CSP page that loads Courvux — even apps that go through the
+// precompiler and never hit the fallback path. We now probe only the first
+// time the fallback is reached. Apps that the precompiler covers entirely
+// never call this and ship a clean console.
+let _evalProbed = false;
+let _evalSupported = false;
+const isEvalSupported = (): boolean => {
+    if (_evalProbed) return _evalSupported;
+    _evalProbed = true;
+    try {
+        new Function('return 1')();
+        _evalSupported = true;
+    } catch {
+        console.warn('[courvux] CSP blocks eval. Falling back to a limited evaluator that handles property access and literals only. Add `vite-plugin-courvux-precompile` to your build for full template support under strict CSP.');
+        _evalSupported = false;
+    }
+    return _evalSupported;
+};
 
 const evalCache = new Map<string, Function>();
 const handlerCache = new Map<string, Function>();
+
+// Per-state registry of build-time precompiled expressions. The
+// vite-plugin-courvux-precompile populates this through `attachCompiledExprs`
+// when a component config carries an `exprs` field. evaluate() and
+// executeHandler() consult it before falling back to `new Function`, so apps
+// that go through the build step can ship without `script-src 'unsafe-eval'`.
+//
+// WeakMap: state objects are reactive Proxies tied to a component instance;
+// their lifetime is the component's lifetime, and we don't want this map to
+// keep them alive after destroy.
+const compiledExprs: WeakMap<object, Record<string, (state: any) => any>> = new WeakMap();
+
+/**
+ * Wire the precompiled expression registry onto a state object. Called
+ * from createApp's mount path when a component config has an `exprs`
+ * field (typically produced by the precompile Vite plugin). Templates
+ * passed to the same state will resolve their expressions through these
+ * functions instead of the runtime `new Function` evaluator.
+ *
+ * Safe to call multiple times — entries are merged, last writer wins.
+ * Safe to omit entirely — evaluate() falls back transparently.
+ */
+export const attachCompiledExprs = (state: object, exprs: Record<string, (state: any) => any>): void => {
+    const existing = compiledExprs.get(state);
+    if (existing) Object.assign(existing, exprs);
+    else compiledExprs.set(state, { ...exprs });
+};
+
+// For internal use by `walk` when entering a child scope (cv-for items,
+// cv-data inline scopes) — the child should still see the parent's
+// precompiled exprs since template fragments share the parent component's
+// expression set.
+const inheritCompiledExprs = (childState: object, parentState: object): void => {
+    const parentExprs = compiledExprs.get(parentState);
+    if (parentExprs) compiledExprs.set(childState, parentExprs);
+};
+export { inheritCompiledExprs };
 
 const safeEval = (expr: string, state: any): any => {
     const t = expr.trim();
@@ -47,7 +101,15 @@ const safeEval = (expr: string, state: any): any => {
 };
 
 export const evaluate = (expr: string, state: any): any => {
-    if (!evalSupported) return safeEval(expr, state);
+    // Precompiled fast path — drops the `new Function` requirement when the
+    // build emitted a function for this expression.
+    const precompiled = compiledExprs.get(state)?.[expr];
+    if (precompiled) {
+        try { return precompiled(state); }
+        catch { /* fall through to runtime path on errors so behavior is identical to pre-precompiler */ }
+    }
+
+    if (!isEvalSupported()) return safeEval(expr, state);
     try {
         let fn = evalCache.get(expr);
         if (!fn) {
@@ -144,7 +206,7 @@ export const setStateValue = (expr: string, state: any, value: any) => {
     // disconnected." We now mirror evaluate's expressivity by splitting the
     // lvalue into parent + key, evaluating each through evaluate(), then
     // assigning outside any `with(...)` scope.
-    if (evalSupported) {
+    if (isEvalSupported()) {
         try {
             const { parent, keyExpr } = splitLvalue(expr);
             const obj = parent ? evaluate(parent, state) : state;
@@ -174,6 +236,12 @@ const makeItemState = (parentState: any, item: any, itemVar: string, index: any,
     Object.keys(parentState).forEach(k => base[k] = parentState[k]);
     base[itemVar] = item;
     if (indexVar) base[indexVar] = index;
+    // Inherit the precompiled-expression registry so that expressions
+    // evaluated inside the per-iteration scope (cv-for items, cv-data
+    // children, etc.) hit the compiled fast path instead of falling back
+    // to `new Function`. The component's exprs cover the whole template,
+    // so the same map applies inside its sub-scopes.
+    inheritCompiledExprs(base, parentState);
     return base;
 };
 
@@ -201,7 +269,29 @@ const applyStyle = (el: HTMLElement, val: any, staticStyle: string) => {
 };
 
 const executeHandler = (expr: string, state: any, event: Event): void => {
-    if (!evalSupported) return;
+    // Precompiled fast path. The build-time compiler emits handler bodies
+    // identically to read expressions — `(($s) => (count++))` mutates state
+    // through the proxy via the `++` op, so the side-effects fire correctly
+    // and the registry covers both read- and side-effect-style handlers.
+    // Only $event references need a tweak: the precompiled body refers to
+    // `$s.$event`, so we splice the event into the state proxy for the call.
+    const precompiled = compiledExprs.get(state)?.[expr];
+    if (precompiled) {
+        try {
+            const eventBridge = new Proxy(state, {
+                get(t, k) { return k === '$event' ? event : (t as any)[k]; },
+                set(t, k, v) { (t as any)[k] = v; return true; },
+                has(_t, k) { return true; }
+            });
+            precompiled(eventBridge);
+            return;
+        } catch (e) {
+            console.warn(`[courvux] handler error "${expr}":`, e);
+            return;
+        }
+    }
+
+    if (!isEvalSupported()) return;
     try {
         let fn = handlerCache.get(expr);
         if (!fn) {
@@ -418,9 +508,14 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             if (context.createChildScope) {
                 const child = context.createChildScope(childData, childMethods);
                 context.registerCleanup?.(child.cleanup);
+                // Same fast-path inheritance trick as cv-for: cv-data scopes
+                // share their parent's compiled-expression registry.
+                inheritCompiledExprs(child.state as object, state as object);
                 await walk(element, child.state, { ...context, subscribe: child.subscribe });
             } else {
-                await walk(element, { ...state, ...childData, ...childMethods }, context);
+                const merged = { ...state, ...childData, ...childMethods };
+                inheritCompiledExprs(merged, state as object);
+                await walk(element, merged, context);
             }
             i++;
             continue;
@@ -543,6 +638,10 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                                         (state as any)[key] = val; return true;
                                     }
                                 });
+                                // Forward the precompiled-expression registry so the per-item
+                                // template hits the compiled fast path (otherwise every
+                                // expression inside cv-for falls back to `new Function`).
+                                inheritCompiledExprs(mergedItemState, state);
 
                                 // Subscribe: route itemVar/indexVar to item scope, rest to parent
                                 const childCtx: WalkContext = {
