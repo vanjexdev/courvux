@@ -5,6 +5,104 @@ Format: `[version] — date — description`
 
 ---
 
+## [0.7.0] — 2026-05-05
+
+Minor — first release that lets apps drop `script-src 'unsafe-eval'` from
+their CSP. Pure addition: every existing app keeps working unchanged
+(same templates, same evaluator, same CSP requirements). Apps that opt
+into the new Vite plugin get expression compilation moved to build time
+and ship under strict CSP.
+
+### Added
+
+#### `vite-plugin-courvux-precompile` — build-time expression compiler
+**Files:** `plugin/vite-plugin-courvux-precompile.js`, runtime hooks in
+`src/dom.ts` and `src/index.ts`.
+
+Pairs with the new [`courvux-precompiler`](https://github.com/vanjexdev/courvux-precompiler)
+crate (Rust → WebAssembly) to translate every Courvux template
+expression — `{{ count + 1 }}`, `:class="{ active: isOn }"`,
+`@click="save(id)"`, `cv-model="form.email"`, arrow callbacks like
+`todos.filter(t => !t.done).length`, multi-statement event handlers,
+ternary, optional chaining — into JavaScript arrow functions that ship
+in the bundle. The runtime checks a per-state `WeakMap` registry before
+falling back to `new Function`, so apps fully covered by the plugin
+never trigger the runtime evaluator and never need `'unsafe-eval'`.
+
+Two opt-in entry points, both backed by the same compiler:
+
+```js
+// 1. Inline string templates inside .js / .ts (zero source change):
+export default {
+    template: \`<button @click="count++">{{ count }}</button>\`,
+    data: { count: 0 },
+};
+
+// 2. HTML files imported with the ?courvux suffix:
+import compiled from './my-component.html?courvux';
+export default {
+    ...compiled,                // spreads { template, exprs }
+    data: { count: 0 },
+};
+```
+
+Plugin behavior is conservative — anything more dynamic than a static
+literal (variable reference, ternary, function call, tagged template) is
+silently skipped, the runtime fallback handles those, and the build-end
+report logs which templates fell back so authors can refactor for full
+CSP coverage.
+
+#### Runtime registry + lazy eval probe
+**Files:** `src/dom.ts`, `src/index.ts`, `src/types.ts`.
+- New export `attachCompiledExprs(state, exprs)` registers a precompiled
+  expression map on a state object via `WeakMap`. Called automatically
+  by `mount()` when the component config carries an `exprs` field.
+- New export `inheritCompiledExprs(child, parent)` forwards the registry
+  through every scope boundary that creates a new state proxy
+  (`makeItemState` for non-keyed `cv-for`, the `mergedItemState` Proxy
+  for keyed `cv-for`, `cv-data` inline scopes). Without this, expressions
+  inside iterations would miss the registry and trip the fallback.
+- `evalSupported` is now a lazy probe (`isEvalSupported()`) instead of
+  a module-init constant. Apps fully covered by the precompiler never
+  run the probe and ship with a clean console under strict CSP — the
+  previous implementation triggered a CSP violation just by loading
+  Courvux.
+- The fallback warning now points at `vite-plugin-courvux-precompile` so
+  devs hitting the limited evaluator know the recommended fix.
+
+#### Strict CSP demo + docs
+- `site/index.html` dropped `'unsafe-eval'` from its `script-src`. The
+  whole docs site now runs under `script-src 'self'`, validating the
+  end-to-end story against 25 components and 258 expressions.
+- New `/csp` page on the docs site walks through setup, the supported
+  expression subset, the build-end report, source-maps story, and
+  performance.
+- README, design-decisions, and FAQ pages link to it.
+
+### Tests
+- `src/__tests__/precompile-registry.test.ts` — 7 runtime tests covering
+  evaluate fast path, attribute bindings, handler mutation, fallback for
+  unregistered expressions, multi-call merge, and registry inheritance
+  through `cv-for` and `cv-data` scopes.
+- `src/__tests__/precompile-plugin.test.ts` — 9 plugin tests covering
+  expression extraction (interpolations, attributes including `>` inside
+  values, event handlers, `cv-for` collection-only extraction, every
+  `cv-*` directive, non-expression attrs ignored), and round-trip
+  compilation through the WASM bindings (dedupe, error envelope, emitted
+  source evaluates correctly against a mock state).
+- 171 unit (was 155), 10 ssr, 20 ssg.
+- Bundle: 66.9 KB min, 21.7 KB gzip (+0.7 KB / +0.2 KB from registry +
+  inherit + lazy probe scaffolding).
+
+### Dependencies
+- Adds `courvux-precompiler` (github:vanjexdev/courvux-precompiler) as a
+  runtime dep so the WASM bindings ship with the package.
+- Adds `acorn` and `magic-string` for the inline-template AST walk.
+  Vite already pulls these as transitives; promoting to direct deps
+  guarantees plugin users have them at the version we tested against.
+
+---
+
 ## [0.6.0] — 2026-05-05
 
 Minor — flips the default for `cv-html` from raw to sanitized. **Breaking
