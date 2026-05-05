@@ -76,6 +76,13 @@ const NAV = [
     label: "Demo",
     items: [{ to: "/demo", label: "⚡ TODO App" }],
   },
+  {
+    key: "projects",
+    label: "Projects",
+    items: [
+      { to: "/projects/notepad", label: "📝 Notepad (Tauri)" },
+    ],
+  },
 ];
 
 // ── App ─────────────────────────────────────────────────────────────────────
