@@ -53,6 +53,7 @@ const NAV = [
       { to: "/devtools", label: "DevTools" },
       { to: "/testing", label: "Testing" },
       { to: "/pwa", label: "PWA" },
+      { to: "/csp", label: "Strict CSP" },
     ],
   },
   {
@@ -177,10 +178,10 @@ createApp({
             ">
                 <!-- Logo -->
                 <div style="padding: 20px 16px 12px; border-bottom: 1px solid #f0f0f0;">
-                    <router-link to="/" @click="closeSidebar()" style="text-decoration:none; display:flex; align-items:center; gap:8px;" aria-label="Courvux v0.6.0 home">
+                    <router-link to="/" @click="closeSidebar()" style="text-decoration:none; display:flex; align-items:center; gap:8px;" aria-label="Courvux v0.7.0 home">
                         <span style="font-size:1.3rem;" aria-hidden="true">⚡</span>
                         <span style="font-weight:700; font-size:15px; color:#111;">Courvux</span>
-                        <span style="font-size:10px; color:#666; margin-left:2px;">v0.6.0</span>
+                        <span style="font-size:10px; color:#666; margin-left:2px;">v0.7.0</span>
                     </router-link>
                 </div>
 

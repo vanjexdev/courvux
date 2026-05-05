@@ -1,8 +1,10 @@
 import { defineConfig } from 'vite';
 import courvuxSsg from 'courvux/plugin/ssg';
+import courvuxPrecompile from 'courvux/plugin/precompile';
 
 export default defineConfig({
     plugins: [
+        courvuxPrecompile(),
         courvuxSsg({
             routes:   async () => (await import('./src/routes-data.js')).default,
             notFound: async () => (await import('./src/pages/NotFound.js')).default,

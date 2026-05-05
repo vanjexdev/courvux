@@ -1,14 +1,15 @@
 {
     "name": "courvux",
     "author": "Vanjexdex",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "type": "module",
     "main": "dist/index.js",
     "exports": {
         ".": "./dist/index.js",
         "./test-utils": "./dist/test-utils.js",
         "./plugin": "./plugin/vite-plugin-courvux.js",
-        "./plugin/ssg": "./plugin/vite-plugin-courvux-ssg.js"
+        "./plugin/ssg": "./plugin/vite-plugin-courvux-ssg.js",
+        "./plugin/precompile": "./plugin/vite-plugin-courvux-precompile.js"
     },
     "types": "dist/index.d.ts",
     "files": [
@@ -43,6 +44,9 @@
         "vitest": "^3.2.4"
     },
     "dependencies": {
-        "lucide": "^1.11.0"
+        "acorn": "^8.16.0",
+        "courvux-precompiler": "github:vanjexdev/courvux-precompiler",
+        "lucide": "^1.11.0",
+        "magic-string": "^0.30.21"
     }
 }

@@ -1,6 +1,6 @@
 import { AppConfig, ComponentConfig, RouteMatch, Router, WatcherOptions, DirectiveDef, DirectiveShorthand, ComputedDef, LazyComponent } from './types.js';
 import { createReactivityScope, batchUpdate, collectDeps, markRaw, toRaw } from './reactivity.js';
-import { walk, WalkContext, evaluate, subscribeExpr, subscribeDeps, setStateValue, injectCloakStyle } from './dom.js';
+import { walk, WalkContext, evaluate, subscribeExpr, subscribeDeps, setStateValue, injectCloakStyle, attachCompiledExprs } from './dom.js';
 import { setupRouterView, RouteActivation } from './router.js';
 import { setupDevTools, nextDevToolsId, DevToolsStoreEntry } from './devtools.js';
 import { mountDevOverlay } from './overlay.js';
@@ -10,6 +10,7 @@ import { subscribeToStore } from './store.js';
 export { createRouter } from './router.js';
 export { createStore } from './store.js';
 export { batchUpdate, markRaw, toRaw, readonly } from './reactivity.js';
+export { attachCompiledExprs } from './dom.js';
 export { createEventBus } from './events.js';
 export type { EventBus } from './events.js';
 export { cvStorage, cvListener, cvMediaQuery, cvFetch, cvDebounce, cvThrottle, defineComposable, useComposables } from './composables.js';
@@ -113,6 +114,16 @@ async function mount(el: HTMLElement, config: ComponentConfig, appContext: AppCo
         ...(appContext.currentRoute ? { $route: appContext.currentRoute } : {}),
         ...(appContext.router ? { $router: appContext.router } : {}),
     });
+
+    // Wire build-time precompiled expressions into the per-state registry.
+    // The vite-plugin-courvux-precompile populates `config.exprs` when it
+    // can statically extract every expression from the template; the
+    // runtime's evaluate() / executeHandler() consult this map before
+    // falling back to `new Function`. Apps that go through the build step
+    // can ship without `script-src 'unsafe-eval'`.
+    if ((config as any).exprs && typeof (config as any).exprs === 'object') {
+        attachCompiledExprs(state as object, (config as any).exprs as Record<string, (s: any) => any>);
+    }
 
     // $watch — programmatic watcher API
     (state as any).$watch = (key: string, handler: Function, options?: { immediate?: boolean; deep?: boolean }) => {

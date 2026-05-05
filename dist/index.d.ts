@@ -2,6 +2,7 @@ import { AppConfig, ComponentConfig, RouteMatch, Router, DirectiveDef, Directive
 export { createRouter } from './router.js';
 export { createStore } from './store.js';
 export { batchUpdate, markRaw, toRaw, readonly } from './reactivity.js';
+export { attachCompiledExprs } from './dom.js';
 export { createEventBus } from './events.js';
 export type { EventBus } from './events.js';
 export { cvStorage, cvListener, cvMediaQuery, cvFetch, cvDebounce, cvThrottle, defineComposable, useComposables } from './composables.js';

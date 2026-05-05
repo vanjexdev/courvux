@@ -133,17 +133,32 @@ function subscribeToStore(store, key, cb) {
 
 // src/dom.ts
 var resolve = (expr, state) => expr.split(".").reduce((o, k) => o?.[k], state);
-var evalSupported = (() => {
+var _evalProbed = false;
+var _evalSupported = false;
+var isEvalSupported = () => {
+  if (_evalProbed) return _evalSupported;
+  _evalProbed = true;
   try {
     new Function("return 1")();
-    return true;
+    _evalSupported = true;
   } catch {
-    console.warn("[courvux] CSP blocks eval. Expressions limited to property access and literals.");
-    return false;
+    console.warn("[courvux] CSP blocks eval. Falling back to a limited evaluator that handles property access and literals only. Add `vite-plugin-courvux-precompile` to your build for full template support under strict CSP.");
+    _evalSupported = false;
   }
-})();
+  return _evalSupported;
+};
 var evalCache = /* @__PURE__ */ new Map();
 var handlerCache = /* @__PURE__ */ new Map();
+var compiledExprs = /* @__PURE__ */ new WeakMap();
+var attachCompiledExprs = (state, exprs) => {
+  const existing = compiledExprs.get(state);
+  if (existing) Object.assign(existing, exprs);
+  else compiledExprs.set(state, { ...exprs });
+};
+var inheritCompiledExprs = (childState, parentState) => {
+  const parentExprs = compiledExprs.get(parentState);
+  if (parentExprs) compiledExprs.set(childState, parentExprs);
+};
 var safeEval = (expr, state) => {
   const t = expr.trim();
   if (t === "true") return true;
@@ -156,7 +171,14 @@ var safeEval = (expr, state) => {
   return resolve(t, state);
 };
 var evaluate = (expr, state) => {
-  if (!evalSupported) return safeEval(expr, state);
+  const precompiled = compiledExprs.get(state)?.[expr];
+  if (precompiled) {
+    try {
+      return precompiled(state);
+    } catch {
+    }
+  }
+  if (!isEvalSupported()) return safeEval(expr, state);
   try {
     let fn = evalCache.get(expr);
     if (!fn) {
@@ -224,7 +246,7 @@ var splitLvalue = (expr) => {
   return result;
 };
 var setStateValue = (expr, state, value) => {
-  if (evalSupported) {
+  if (isEvalSupported()) {
     try {
       const { parent, keyExpr } = splitLvalue(expr);
       const obj = parent ? evaluate(parent, state) : state;
@@ -250,6 +272,7 @@ var makeItemState = (parentState, item, itemVar, index, indexVar) => {
   Object.keys(parentState).forEach((k) => base[k] = parentState[k]);
   base[itemVar] = item;
   if (indexVar) base[indexVar] = index;
+  inheritCompiledExprs(base, parentState);
   return base;
 };
 var resolveClass = (val) => {
@@ -276,7 +299,29 @@ var applyStyle = (el, val, staticStyle) => {
   }
 };
 var executeHandler = (expr, state, event) => {
-  if (!evalSupported) return;
+  const precompiled = compiledExprs.get(state)?.[expr];
+  if (precompiled) {
+    try {
+      const eventBridge = new Proxy(state, {
+        get(t, k) {
+          return k === "$event" ? event : t[k];
+        },
+        set(t, k, v) {
+          t[k] = v;
+          return true;
+        },
+        has(_t, k) {
+          return true;
+        }
+      });
+      precompiled(eventBridge);
+      return;
+    } catch (e) {
+      console.warn(`[courvux] handler error "${expr}":`, e);
+      return;
+    }
+  }
+  if (!isEvalSupported()) return;
   try {
     let fn = handlerCache.get(expr);
     if (!fn) {
@@ -476,9 +521,12 @@ async function walk(el, state, context) {
       if (context.createChildScope) {
         const child = context.createChildScope(childData, childMethods);
         context.registerCleanup?.(child.cleanup);
+        inheritCompiledExprs(child.state, state);
         await walk(element, child.state, { ...context, subscribe: child.subscribe });
       } else {
-        await walk(element, { ...state, ...childData, ...childMethods }, context);
+        const merged = { ...state, ...childData, ...childMethods };
+        inheritCompiledExprs(merged, state);
+        await walk(element, merged, context);
       }
       i++;
       continue;
@@ -572,6 +620,7 @@ async function walk(el, state, context) {
                     return true;
                   }
                 });
+                inheritCompiledExprs(mergedItemState, state);
                 const childCtx = {
                   ...context,
                   subscribe: (key, cb) => {
@@ -2192,6 +2241,9 @@ async function mount(el, config, appContext) {
     ...appContext.currentRoute ? { $route: appContext.currentRoute } : {},
     ...appContext.router ? { $router: appContext.router } : {}
   });
+  if (config.exprs && typeof config.exprs === "object") {
+    attachCompiledExprs(state, config.exprs);
+  }
   state.$watch = (key, handler, options) => {
     const deep = options?.deep ?? false;
     const immediate = options?.immediate ?? false;

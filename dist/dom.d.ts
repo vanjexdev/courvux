@@ -20,6 +20,19 @@ export interface WalkContext {
     };
 }
 export declare const resolve: (expr: string, state: any) => any;
+/**
+ * Wire the precompiled expression registry onto a state object. Called
+ * from createApp's mount path when a component config has an `exprs`
+ * field (typically produced by the precompile Vite plugin). Templates
+ * passed to the same state will resolve their expressions through these
+ * functions instead of the runtime `new Function` evaluator.
+ *
+ * Safe to call multiple times — entries are merged, last writer wins.
+ * Safe to omit entirely — evaluate() falls back transparently.
+ */
+export declare const attachCompiledExprs: (state: object, exprs: Record<string, (state: any) => any>) => void;
+declare const inheritCompiledExprs: (childState: object, parentState: object) => void;
+export { inheritCompiledExprs };
 export declare const evaluate: (expr: string, state: any) => any;
 export declare const subscribeExpr: (expr: string, context: WalkContext, cb: Function) => (() => void);
 export declare const subscribeDeps: (expr: string, context: WalkContext, cb: Function) => (() => void);

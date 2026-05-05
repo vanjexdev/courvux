@@ -3,6 +3,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import courvuxSsg from "../plugin/vite-plugin-courvux-ssg.js";
+import courvuxPrecompile from "../plugin/vite-plugin-courvux-precompile.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +19,7 @@ export default defineConfig({
   },
   plugins: [
     tailwindcss(),
+    courvuxPrecompile(),
     courvuxSsg({
       // Reuse the same routes that the client router consumes
       routes: async () => (await import("./src/routes-data.js")).default,
