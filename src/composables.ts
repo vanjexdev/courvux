@@ -1,4 +1,5 @@
 import { createStore } from './store.js';
+import type { ComputedDef, WatcherEntry } from './types.js';
 
 // cvStorage — store backed by localStorage; auto-persists on every mutation
 export function cvStorage<T extends Record<string, any>>(
@@ -137,4 +138,89 @@ export function cvThrottle<T extends (this: any, ...args: any[]) => any>(fn: T, 
     } as T & { cancel(): void };
     throttled.cancel = () => { clearTimeout(timer); lastTime = 0; };
     return throttled;
+}
+
+// ── defineComposable / useComposables ────────────────────────────────────────
+// Reusable bundle of data, methods, computed, watch and lifecycle hooks that
+// can be spread into a component config. Keeps logic portable across
+// components without coupling to the global store.
+
+export interface ComposableConfig {
+    data?: Record<string, any>;
+    methods?: Record<string, Function>;
+    computed?: Record<string, ComputedDef>;
+    watch?: Record<string, WatcherEntry>;
+    onBeforeMount?(this: any): void;
+    onMount?(this: any): void;
+    onBeforeUpdate?(this: any): void;
+    onUpdated?(this: any): void;
+    onBeforeUnmount?(this: any): void;
+    onDestroy?(this: any): void;
+}
+
+export type ComposableFactory<TArgs extends any[] = any[]> = (...args: TArgs) => ComposableConfig;
+
+// Identity helper. Exists for type-inference + intent ("this is a composable").
+// `defineComposable(fn)` is `fn`; the runtime is a no-op.
+export function defineComposable<TArgs extends any[]>(
+    factory: ComposableFactory<TArgs>
+): ComposableFactory<TArgs> {
+    return factory;
+}
+
+const COMPOSABLE_HOOKS: Array<keyof ComposableConfig> = [
+    'onBeforeMount', 'onMount', 'onBeforeUpdate', 'onUpdated', 'onBeforeUnmount', 'onDestroy'
+];
+
+// Merge multiple composable configs (or plain config-like objects) into one.
+// First-writer wins for data/methods/computed/watch; collisions log a warning.
+// Hooks run in insertion order.
+export function useComposables(...composables: ComposableConfig[]): ComposableConfig {
+    const merged: ComposableConfig = { data: {}, methods: {}, computed: {}, watch: {} };
+    const hookFns: Record<string, Array<(this: any) => void>> = {};
+
+    const mergeBucket = (bucket: 'data' | 'methods' | 'computed' | 'watch', src: Record<string, any> | undefined) => {
+        if (!src) return;
+        const dest = merged[bucket] as Record<string, any>;
+        for (const k of Object.keys(src)) {
+            if (k in dest) {
+                console.warn(`[courvux] useComposables: ${bucket} key "${k}" already defined; ignoring duplicate.`);
+                continue;
+            }
+            dest[k] = src[k];
+        }
+    };
+
+    for (const c of composables) {
+        if (!c) continue;
+        mergeBucket('data', c.data);
+        mergeBucket('methods', c.methods);
+        mergeBucket('computed', c.computed);
+        mergeBucket('watch', c.watch);
+        for (const h of COMPOSABLE_HOOKS) {
+            const fn = c[h];
+            if (typeof fn === 'function') {
+                (hookFns[h] ||= []).push(fn as (this: any) => void);
+            }
+        }
+    }
+
+    for (const h of COMPOSABLE_HOOKS) {
+        const arr = hookFns[h];
+        if (arr && arr.length) {
+            (merged as any)[h] = function (this: any) {
+                for (const fn of arr) fn.call(this);
+            };
+        }
+    }
+
+    // Drop empty buckets so the spread doesn't shadow component-level keys
+    // (e.g. a component declaring `data: { foo: 1 }` should win when the
+    // spread didn't contribute any data).
+    if (Object.keys(merged.data!).length === 0) delete merged.data;
+    if (Object.keys(merged.methods!).length === 0) delete merged.methods;
+    if (Object.keys(merged.computed!).length === 0) delete merged.computed;
+    if (Object.keys(merged.watch!).length === 0) delete merged.watch;
+
+    return merged;
 }
