@@ -80,6 +80,13 @@ createApp({
         },
         // Drag & drop — HTML5 native API. We reorder by mutating `cards`
         // in place; the keyed `cv-for` reuses DOM nodes for unchanged rows.
+        //
+        // Important: always look up positions with findIndex(c => c.id === id),
+        // never indexOf(cardObj). Courvux wraps each property access in a fresh
+        // Proxy, so the object returned by .find() is not === to the same row
+        // when read again from this.cards — indexOf would return -1 and
+        // splice(-1, 1) would delete the wrong row, leaving the dragged one
+        // duplicated when push() puts it back.
         onDragStart(id, fromCol, ev) {
             this.dragId = id;
             this.dragFrom = fromCol;
@@ -90,25 +97,27 @@ createApp({
         onColDragOver(ev) { ev.preventDefault(); ev.dataTransfer.dropEffect = 'move'; },
         onColDrop(toCol) {
             if (this.dragId == null) return;
-            const card = this.cards.find(c => c.id === this.dragId);
-            if (!card) return;
-            // If dropped on the column body (not on a card), append to end.
-            const fromIdx = this.cards.indexOf(card);
-            this.cards.splice(fromIdx, 1);
-            card.col = toCol;
-            this.cards.push(card);
+            const id = this.dragId;
+            const fromIdx = this.cards.findIndex(c => c.id === id);
+            if (fromIdx < 0) { this.dragId = null; this.dragFrom = null; return; }
+            this.cards[fromIdx].col = toCol;
+            const [moved] = this.cards.splice(fromIdx, 1);
+            this.cards.push(moved);
             this.dragId = null; this.dragFrom = null;
         },
         onCardDrop(targetId, ev) {
             ev.stopPropagation();
             if (this.dragId == null || this.dragId === targetId) return;
-            const dragged = this.cards.find(c => c.id === this.dragId);
-            const target  = this.cards.find(c => c.id === targetId);
-            if (!dragged || !target) return;
-            // Move dragged into target's column at target's position.
-            this.cards.splice(this.cards.indexOf(dragged), 1);
-            dragged.col = target.col;
-            this.cards.splice(this.cards.indexOf(target), 0, dragged);
+            const id = this.dragId;
+            const fromIdx = this.cards.findIndex(c => c.id === id);
+            const targetIdx = this.cards.findIndex(c => c.id === targetId);
+            if (fromIdx < 0 || targetIdx < 0) { this.dragId = null; this.dragFrom = null; return; }
+            const targetCol = this.cards[targetIdx].col;
+            this.cards[fromIdx].col = targetCol;
+            const [moved] = this.cards.splice(fromIdx, 1);
+            // Target's index may have shifted left if it sat after the removed row.
+            const insertAt = this.cards.findIndex(c => c.id === targetId);
+            this.cards.splice(insertAt, 0, moved);
             this.dragId = null; this.dragFrom = null;
         },
         clearAll() {
