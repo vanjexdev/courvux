@@ -43,6 +43,7 @@
         "vitest": "^3.2.4"
     },
     "dependencies": {
+        "courvux-precompiler": "github:vanjexdev/courvux-precompiler",
         "lucide": "^1.11.0"
     }
 }
