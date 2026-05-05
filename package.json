@@ -43,7 +43,9 @@
         "vitest": "^3.2.4"
     },
     "dependencies": {
+        "acorn": "^8.16.0",
         "courvux-precompiler": "github:vanjexdev/courvux-precompiler",
-        "lucide": "^1.11.0"
+        "lucide": "^1.11.0",
+        "magic-string": "^0.30.21"
     }
 }

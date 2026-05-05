@@ -44,6 +44,15 @@ export interface ComponentConfig {
     onBeforeRouteEnter?(this: any, from: RouteMatch | null): void;
     inheritAttrs?: boolean;
     loadingTemplate?: string;
+    /**
+     * Build-time precompiled expression map keyed by the expression source
+     * string. Populated by `vite-plugin-courvux-precompile`. The runtime
+     * checks this before falling back to `new Function`, so apps that go
+     * through the build step can ship without `script-src 'unsafe-eval'`.
+     * Hand-written components can ignore this field — runtime falls back
+     * transparently.
+     */
+    exprs?: Record<string, (state: any) => any>;
 }
 export type LazyComponent = () => Promise<{
     default: ComponentConfig;

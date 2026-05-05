@@ -144,6 +144,12 @@ var evalSupported = (() => {
 })();
 var evalCache = /* @__PURE__ */ new Map();
 var handlerCache = /* @__PURE__ */ new Map();
+var compiledExprs = /* @__PURE__ */ new WeakMap();
+var attachCompiledExprs = (state, exprs) => {
+  const existing = compiledExprs.get(state);
+  if (existing) Object.assign(existing, exprs);
+  else compiledExprs.set(state, { ...exprs });
+};
 var safeEval = (expr, state) => {
   const t = expr.trim();
   if (t === "true") return true;
@@ -156,6 +162,13 @@ var safeEval = (expr, state) => {
   return resolve(t, state);
 };
 var evaluate = (expr, state) => {
+  const precompiled = compiledExprs.get(state)?.[expr];
+  if (precompiled) {
+    try {
+      return precompiled(state);
+    } catch {
+    }
+  }
   if (!evalSupported) return safeEval(expr, state);
   try {
     let fn = evalCache.get(expr);
@@ -276,6 +289,28 @@ var applyStyle = (el, val, staticStyle) => {
   }
 };
 var executeHandler = (expr, state, event) => {
+  const precompiled = compiledExprs.get(state)?.[expr];
+  if (precompiled) {
+    try {
+      const eventBridge = new Proxy(state, {
+        get(t, k) {
+          return k === "$event" ? event : t[k];
+        },
+        set(t, k, v) {
+          t[k] = v;
+          return true;
+        },
+        has(_t, k) {
+          return true;
+        }
+      });
+      precompiled(eventBridge);
+      return;
+    } catch (e) {
+      console.warn(`[courvux] handler error "${expr}":`, e);
+      return;
+    }
+  }
   if (!evalSupported) return;
   try {
     let fn = handlerCache.get(expr);
@@ -2192,6 +2227,9 @@ async function mount(el, config, appContext) {
     ...appContext.currentRoute ? { $route: appContext.currentRoute } : {},
     ...appContext.router ? { $router: appContext.router } : {}
   });
+  if (config.exprs && typeof config.exprs === "object") {
+    attachCompiledExprs(state, config.exprs);
+  }
   state.$watch = (key, handler, options) => {
     const deep = options?.deep ?? false;
     const immediate = options?.immediate ?? false;

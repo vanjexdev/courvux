@@ -115,10 +115,119 @@ export default function courvuxPrecompile(options = {}) {
             };
         },
 
-        // Inline `template:` literals inside .js/.ts files.
-        // Stub for now — wired up in a later commit.
-        async transform(/* code, id */) {
-            return null;
+        // Inline `template:` literals inside .js / .ts files.
+        //
+        // Strategy: parse the module with acorn, walk every ObjectExpression,
+        // find Property nodes whose key is `template` and whose value is a
+        // string-literal-shaped expression (StringLiteral or TemplateLiteral
+        // with no `${...}` interpolations). Extract every Courvux template
+        // expression from the string, compile each via WASM, and use
+        // magic-string to insert an `exprs:` sibling property in place.
+        //
+        // Anything more dynamic (Identifier, ConditionalExpression, etc.) is
+        // skipped silently — runtime falls back to `new Function` for that
+        // component, just at the cost of needing `unsafe-eval` for those
+        // specific expressions.
+        async transform(code, id) {
+            // Skip non-source files and the plugin itself.
+            const cleanId = id.split('?')[0];
+            if (!/\.(?:js|ts|mjs|mts|jsx|tsx)$/.test(cleanId)) return null;
+            if (cleanId.includes('/node_modules/')) return null;
+            if (!code.includes('template')) return null; // cheap pre-check
+
+            const { parse } = await import('acorn');
+            const MagicStringMod = await import('magic-string');
+            const MagicString = MagicStringMod.default ?? MagicStringMod;
+
+            let ast;
+            try {
+                ast = parse(code, {
+                    ecmaVersion: 'latest',
+                    sourceType: 'module',
+                    locations: true,
+                });
+            } catch {
+                // Not parseable JS — Vite's main pipeline will report the
+                // syntax error; we just don't precompile this file.
+                return null;
+            }
+
+            const ms = new MagicString(code);
+            let changed = false;
+            let templatesFound = 0;
+            let templatesSkipped = 0;
+
+            walkNodes(ast, (node, parent) => {
+                if (node.type !== 'Property') return;
+                if (node.computed) return;
+                const keyName = node.key.type === 'Identifier' ? node.key.name
+                              : node.key.type === 'Literal' ? node.key.value
+                              : null;
+                if (keyName !== 'template') return;
+
+                templatesFound += 1;
+
+                const tpl = staticTemplateString(node.value);
+                if (tpl === null) {
+                    templatesSkipped += 1;
+                    stats.fallbackTemplates += 1;
+                    if (warn) {
+                        const loc = node.value.loc?.start;
+                        stats.skippedTemplates.push({
+                            file: cleanId,
+                            line: loc?.line,
+                            reason: `\`template\` value is ${node.value.type}, not a static literal`,
+                        });
+                    }
+                    return;
+                }
+
+                // Skip if sibling `exprs:` already present (component author
+                // hand-wrote one, or we ran twice somehow).
+                const siblingExprs = parent && parent.type === 'ObjectExpression'
+                    ? parent.properties.find(p => p.type === 'Property'
+                        && !p.computed
+                        && ((p.key.type === 'Identifier' && p.key.name === 'exprs')
+                         || (p.key.type === 'Literal' && p.key.value === 'exprs')))
+                    : null;
+                if (siblingExprs) return;
+
+                const result = compileHtml(tpl, wasm, { file: cleanId, warn });
+                if (result.exprCount === 0) {
+                    // Nothing to precompile (template has no expressions);
+                    // skip insertion to keep the diff minimal.
+                    return;
+                }
+
+                stats.precompiledExprs += result.exprCount;
+                for (const skip of result.skipped) {
+                    stats.skippedTemplates.push({
+                        file: cleanId,
+                        line: node.value.loc?.start?.line,
+                        ...skip,
+                    });
+                }
+
+                // Inject `exprs: { ... },` immediately AFTER the template
+                // property so the diff stays surgical.
+                const exprEntries = Object.entries(result.exprMap)
+                    .map(([src, fn]) => `${JSON.stringify(src)}: ${fn}`)
+                    .join(', ');
+                const insertion = `, exprs: { ${exprEntries} }`;
+                ms.appendRight(node.end, insertion);
+                changed = true;
+            });
+
+            if (!changed) {
+                stats.files += templatesFound > templatesSkipped ? 1 : 0;
+                return null;
+            }
+            stats.files += 1;
+
+            return {
+                code: ms.toString(),
+                map: ms.generateMap({ source: id, includeContent: true, hires: 'boundary' }),
+            };
         },
 
         buildEnd() {
@@ -282,6 +391,55 @@ function isExpressionAttr(name) {
         default:
             return false;
     }
+}
+
+/**
+ * Pre-order AST walk that visits every node and reports the parent.
+ * Lightweight alternative to `acorn-walk` so we don't take another dep
+ * just for this. Skips the locations / start / end keys to avoid runaway
+ * recursion through circular metadata.
+ *
+ * @param {object} node
+ * @param {(node: object, parent: object | null) => void} visit
+ * @param {object | null} [parent]
+ */
+function walkNodes(node, visit, parent = null) {
+    if (!node || typeof node !== 'object') return;
+    if (typeof node.type === 'string') visit(node, parent);
+    for (const key of Object.keys(node)) {
+        if (key === 'loc' || key === 'start' || key === 'end' || key === 'range') continue;
+        const child = node[key];
+        if (Array.isArray(child)) {
+            for (const item of child) walkNodes(item, visit, node);
+        } else if (child && typeof child === 'object') {
+            walkNodes(child, visit, node);
+        }
+    }
+}
+
+/**
+ * If `node` is an expression that resolves to a static string at build
+ * time, return the string's value. Otherwise return null and the caller
+ * leaves the template alone (runtime fallback).
+ *
+ * Accepted shapes:
+ *   - StringLiteral / Literal { value: 'string' }
+ *   - TemplateLiteral with no expressions  (e.g. `<div>...</div>` with no `${}`)
+ *
+ * @param {object} node — acorn AST node
+ * @returns {string | null}
+ */
+function staticTemplateString(node) {
+    if (!node) return null;
+    if (node.type === 'Literal' && typeof node.value === 'string') return node.value;
+    if (node.type === 'TemplateLiteral'
+        && Array.isArray(node.expressions)
+        && node.expressions.length === 0
+        && Array.isArray(node.quasis)
+        && node.quasis.length === 1) {
+        return node.quasis[0].value.cooked;
+    }
+    return null;
 }
 
 /**
