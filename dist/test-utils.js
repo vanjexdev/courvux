@@ -782,6 +782,7 @@ async function walk(el, state, context) {
       }
       i = j;
       let activeClone = null;
+      let activeIdx = -1;
       let rendering = false;
       let dirty = false;
       const render = async () => {
@@ -793,22 +794,31 @@ async function walk(el, state, context) {
         try {
           do {
             dirty = false;
+            let nextIdx = -1;
+            for (let bi = 0; bi < chain.length; bi++) {
+              const branch2 = chain[bi];
+              if (branch2.condition === null || !!evaluate(branch2.condition, state)) {
+                nextIdx = bi;
+                break;
+              }
+            }
+            if (nextIdx === activeIdx && activeClone) {
+              continue;
+            }
             if (activeClone) {
               activeClone.parentNode?.removeChild(activeClone);
               activeClone = null;
             }
-            for (const branch of chain) {
-              if (branch.condition === null || !!evaluate(branch.condition, state)) {
-                const clone = branch.template.cloneNode(true);
-                const frag = document.createDocumentFragment();
-                frag.appendChild(clone);
-                await walk(frag, state, context);
-                const actualEl = frag.firstChild ?? clone;
-                branch.anchor.parentNode?.insertBefore(frag, branch.anchor.nextSibling);
-                activeClone = actualEl;
-                break;
-              }
-            }
+            activeIdx = nextIdx;
+            if (nextIdx < 0) continue;
+            const branch = chain[nextIdx];
+            const clone = branch.template.cloneNode(true);
+            const frag = document.createDocumentFragment();
+            frag.appendChild(clone);
+            await walk(frag, state, context);
+            const actualEl = frag.firstChild ?? clone;
+            branch.anchor.parentNode?.insertBefore(frag, branch.anchor.nextSibling);
+            activeClone = actualEl;
           } while (dirty);
         } finally {
           rendering = false;
