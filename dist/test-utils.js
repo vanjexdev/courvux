@@ -188,7 +188,22 @@ var subscribeDeps = (expr, context, cb) => {
   const unsubs = deps.map((dep) => subscribeExpr(dep, context, cb));
   return () => unsubs.forEach((u) => u());
 };
+var writerCache = /* @__PURE__ */ new Map();
 var setStateValue = (expr, state, value) => {
+  if (evalSupported) {
+    try {
+      let fn = writerCache.get(expr);
+      if (!fn) {
+        fn = new Function("__s__", "__v__", `with(__s__){ (${expr}) = __v__ }`);
+        writerCache.set(expr, fn);
+      }
+      fn(state, value);
+      return;
+    } catch (e) {
+      console.warn(`[courvux] setStateValue: write failed for "${expr}":`, e);
+      return;
+    }
+  }
   const parts = expr.split(".");
   if (parts.length === 1) {
     state[parts[0]] = value;
