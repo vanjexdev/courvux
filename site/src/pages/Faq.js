@@ -106,6 +106,15 @@ it('counter increments on click', async () => {
     expect(w.find('button').textContent).toBe('1');
     w.destroy();
 });`,
+
+        s_proxyId_faq: `// ❌ Bug — find() and indexOf() return different proxy wrappers
+const card = this.cards.find(c => c.id === id);
+const idx  = this.cards.indexOf(card);   // -1
+this.cards.splice(idx, 1);                // splice(-1, 1) deletes the last row
+
+// ✅ Find positions by primitive id
+const idx = this.cards.findIndex(c => c.id === id);
+this.cards.splice(idx, 1);`,
     },
     template: `
         <div class="prose">
@@ -152,6 +161,11 @@ it('counter increments on click', async () => {
 
             <h2>Can I use it without a build step?</h2>
             <p>Yes. Courvux is a single ES module. Drop an importmap and a <code>&lt;script type="module"&gt;</code> into any HTML file and you're done. See <router-link to="/installation" class="link">Installation → Without a bundler</router-link>.</p>
+
+            <h2>Why does my drag-and-drop / array-mutation code delete the wrong row?</h2>
+            <p>This is the proxy-identity pitfall. Courvux wraps each property access in a fresh Proxy, so the object you grab with <code>find()</code> is not <code>===</code> to the same row when read again from the array — <code>indexOf(card)</code> returns <code>-1</code>, and <code>splice(-1, 1)</code> silently deletes the LAST row instead of the one you meant. The dragged row is then re-added by <code>push()</code> and you see what looks like a duplicate.</p>
+            <code-block :lang="'js'" :code="s_proxyId_faq"></code-block>
+            <p>Always look items up by primitive id with <code>findIndex</code>, or unwrap with <code>toRaw</code> if you really need identity. The full discussion lives at <router-link to="/reactivity" class="link">Reactivity → Common gotchas</router-link>.</p>
 
             <div style="margin-top:2rem; display:flex; gap:12px;">
                 <router-link to="/design-decisions" style="font-size:13px; color:#555;">← Design Decisions</router-link>
