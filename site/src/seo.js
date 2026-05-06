@@ -2,6 +2,7 @@ import { useHead } from 'courvux';
 
 const SITE_NAME = 'Courvux';
 const BASE_URL  = 'https://vanjexdev.github.io/courvux';
+const OG_IMAGE  = `${BASE_URL}/og-image.png`;
 
 /**
  * Page-level SEO metadata. Call once per page from `onMount`.
@@ -26,9 +27,16 @@ export function setHead({ title, description, slug = '/' }) {
             { property: 'og:type',          content: 'website' },
             { property: 'og:url',           content: url },
             { property: 'og:site_name',     content: SITE_NAME },
+            // Per-page SEO falls back to the site OG image. Pages that
+            // genuinely need a different visual (e.g. a project showcase
+            // with its own banner) can extend this map themselves.
+            { property: 'og:image',         content: OG_IMAGE },
+            { property: 'og:image:width',   content: '1200' },
+            { property: 'og:image:height',  content: '630' },
             { name: 'twitter:card',         content: 'summary_large_image' },
             { name: 'twitter:title',        content: fullTitle },
             { name: 'twitter:description',  content: description },
+            { name: 'twitter:image',        content: OG_IMAGE },
         ],
         link: [
             { rel: 'canonical', href: url },
