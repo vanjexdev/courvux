@@ -23,7 +23,7 @@ createApp({
             <!-- Hero -->
             <div style="padding: 3rem 0 2rem; border-bottom: 1px solid #e8e8e8; margin-bottom: 2.5rem;">
                 <div style="display:flex; align-items:center; gap:12px; margin-bottom:1rem;">
-                    <span style="font-size:2rem;">⚡</span>
+                    <img src="/courvux/logo.png" alt="Courvux" width="48" height="48" style="display:block;" />
                     <h1 style="font-size:2rem; font-weight:700; margin:0;">Courvux</h1>
                     <span class="badge">v0.7.1</span>
                 </div>
