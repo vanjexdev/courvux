@@ -1,14 +1,17 @@
 <p align="center">
-  <strong>Courvux</strong>
-  <br>
-  <em>Lightweight reactive UI framework for the browser.</em>
-  <br>
-  No virtual DOM. ~20 KB gzip with router, store, devtools, composables, useHead, and SSR primitives. Vue/Alpine ergonomics.
+  <img alt="Courvux" src="./logo.png" width="140" height="140">
+</p>
+
+<h1 align="center">Courvux</h1>
+
+<p align="center">
+  <em>Lightweight reactive UI framework for the browser.</em><br>
+  No virtual DOM. ~22&nbsp;KB gzip with router, store, devtools, composables, useHead, and SSR primitives. Vue/Alpine ergonomics.
 </p>
 
 <p align="center">
   <img alt="version"  src="https://img.shields.io/badge/version-0.7.1-blue">
-  <img alt="size"     src="https://img.shields.io/badge/gzip-~20kB-brightgreen">
+  <img alt="size"     src="https://img.shields.io/badge/gzip-~22kB-brightgreen">
   <img alt="license"  src="https://img.shields.io/badge/license-MIT-lightgrey">
   <img alt="ts"       src="https://img.shields.io/badge/TypeScript-strict-3178c6">
 </p>
