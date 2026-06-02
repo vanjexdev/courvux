@@ -5,6 +5,36 @@ Format: `[version] — date — description`
 
 ---
 
+## [7.1.1] — 2026-06-02
+
+Patch — fixes iframe mounting edge cases and tightens `cv-else` chain
+handling.
+
+### Bug fixes
+
+#### Apps mounted in iframe-like `about:blank` contexts could render empty
+**Files:** `src/index.ts`, `src/router.ts`, `src/dom.ts`
+- Guard `document.baseURI` resolution so `about:blank` / `about:srcdoc`
+  no longer throw during mount.
+- Normalize non-slash history pathnames to `/`, so a history-mode
+  router mounted inside an iframe can still match the root route.
+- Apply the same path normalization to `router-link` active-state checks.
+
+#### `cv-else` could render alongside a true `cv-if`
+**File:** `src/dom.ts`
+- Treat HTML comments between `cv-if`, `cv-else-if`, and `cv-else` as
+  transparent so conditional chains stay linked.
+- Warn when `cv-else` / `cv-else-if` reaches the normal walk path without
+  an adjacent chain.
+
+### Tests
+- `src/__tests__/iframe-history.test.ts` — new coverage for
+  `about:blank` base URLs and history-mode root matching.
+- `src/__tests__/cv-if.test.ts` — regression coverage for comment-separated
+  `cv-else` chains and orphan `cv-else` warnings.
+
+---
+
 ## [0.7.1] — 2026-05-05
 
 Patch — `cv-if` no longer destroys and rebuilds the active branch when

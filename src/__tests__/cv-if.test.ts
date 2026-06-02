@@ -42,6 +42,36 @@ describe('cv-if / cv-else-if / cv-else', () => {
         w.destroy();
     });
 
+    it('keeps cv-else adjacent when only HTML comments exist between branches', async () => {
+        const w = await mount({
+            template: '<p cv-if="role === \'teacher\'">teacher</p><!-- spacer --><p cv-else>student</p>',
+            data: { role: 'teacher' }
+        });
+        expect(w.text()).toBe('teacher');
+
+        w.state.role = 'student';
+        await w.nextTick();
+        expect(w.text()).toBe('student');
+        w.destroy();
+    });
+
+    it('warns on orphan cv-else and treats it as normal element', async () => {
+        const warn = console.warn;
+        const warns: string[] = [];
+        console.warn = (...args: any[]) => warns.push(String(args[0] ?? ''));
+        try {
+            const w = await mount({
+                template: '<p cv-else>fallback</p>',
+                data: {}
+            });
+            expect(w.text()).toBe('fallback');
+            expect(warns.some(m => m.includes('cv-else has no adjacent cv-if/cv-else-if'))).toBe(true);
+            w.destroy();
+        } finally {
+            console.warn = warn;
+        }
+    });
+
     it('cv-if reacts to expressions involving nested property access (e.g. items.length)', async () => {
         const w = await mount({
             template: '<p cv-if="items.length > 0">have</p><p cv-else>empty</p>',

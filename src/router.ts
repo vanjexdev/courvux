@@ -189,8 +189,16 @@ export function setupRouterView(el: HTMLElement, router: Router, mount: MountFn,
     const normalizePath = (p: string): string =>
         (p.length > 1 && p.endsWith('/')) ? p.slice(0, -1) : p;
 
+    const normalizeHistoryPath = (pathname: string): string => {
+        const stripped = normalizePath(stripBase(pathname, base));
+        // about:blank-like contexts expose pathname without leading slash
+        // (e.g. "blank"), which should map to root for SPA routing.
+        if (!stripped || !stripped.startsWith('/')) return '/';
+        return stripped;
+    };
+
     const getCurrentPath = () => {
-        if (router.mode === 'history') return normalizePath(stripBase(window.location.pathname, base));
+        if (router.mode === 'history') return normalizeHistoryPath(window.location.pathname);
         const hash = window.location.hash.slice(1) || '/';
         return normalizePath(hash.split('?')[0] || '/');
     };

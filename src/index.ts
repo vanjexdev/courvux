@@ -841,8 +841,18 @@ export function createApp(config: AppConfig): CourvuxApp {
         },
     };
 
+    const resolveBaseUrl = (): string | undefined => {
+        try {
+            return new URL('.', document.baseURI).href;
+        } catch {
+            // about:blank / about:srcdoc are not valid URL bases for new URL('.').
+            // In those contexts we skip base resolution; inline templates still work.
+            return undefined;
+        }
+    };
+
     const _mountEl = async (root: HTMLElement) => {
-        const baseUrl = new URL('.', document.baseURI).href;
+        const baseUrl = resolveBaseUrl();
 
         const appContext: AppContext = {
             components: globalComponents,

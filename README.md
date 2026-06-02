@@ -10,13 +10,13 @@
 </p>
 
 <p align="center">
-  <img alt="version"  src="https://img.shields.io/badge/version-0.7.1-blue">
+  <img alt="version"  src="https://img.shields.io/badge/version-7.1.1-blue">
   <img alt="size"     src="https://img.shields.io/badge/gzip-~22kB-brightgreen">
   <img alt="license"  src="https://img.shields.io/badge/license-MIT-lightgrey">
   <img alt="ts"       src="https://img.shields.io/badge/TypeScript-strict-3178c6">
 </p>
 
-**Author:** Vanjex — **Version:** 0.7.1
+**Author:** Vanjex — **Version:** 7.1.1
 
 ---
 
@@ -188,7 +188,7 @@ npm install github:vanjexdev/courvux
 Pin a tag for stable installs:
 
 ```bash
-pnpm add github:vanjexdev/courvux#v0.7.1
+pnpm add github:vanjexdev/courvux#v7.1.1
 ```
 
 **Without a bundler** — use an import map:
@@ -2677,7 +2677,7 @@ If you're shipping something with Courvux, [open a PR](https://github.com/vanjex
 
 ## Top-level exports
 
-Everything exported from `'courvux'` (v0.7.1):
+Everything exported from `'courvux'` (v7.1.1):
 
 **App & lifecycle:**
 `createApp`, `defineComponent`, `defineAsyncComponent`, `createPlugin`, `autoInit`, `nextTick`, `html`

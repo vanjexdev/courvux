@@ -798,6 +798,11 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             while (j < nodes.length) {
                 const sib = nodes[j];
                 if (sib.nodeType === 3 && (sib.textContent?.trim() ?? '') === '') { j++; continue; }
+                // Keep chains adjacent through HTML comments.
+                // `<div cv-if>...</div><!-- note --><div cv-else>...</div>`
+                // should behave as a single conditional chain, not as two
+                // independently rendered nodes.
+                if (sib.nodeType === 8) { j++; continue; }
                 if (sib.nodeType !== 1) break;
                 const sibEl = sib as HTMLElement;
                 if (sibEl.hasAttribute('cv-else-if')) {
@@ -875,6 +880,20 @@ export async function walk(el: Node, state: any, context: WalkContext) {
             });
             await render();
             continue;
+        }
+
+        // Orphan cv-else / cv-else-if
+        // These directives only make sense immediately after cv-if chains.
+        // If they reach this point, no eligible preceding chain captured them.
+        if (element.hasAttribute('cv-else-if') || element.hasAttribute('cv-else')) {
+            if (element.hasAttribute('cv-else-if')) {
+                console.warn('[courvux] cv-else-if has no adjacent cv-if/cv-else-if and will be treated as a normal element.');
+                element.removeAttribute('cv-else-if');
+            }
+            if (element.hasAttribute('cv-else')) {
+                console.warn('[courvux] cv-else has no adjacent cv-if/cv-else-if and will be treated as a normal element.');
+                element.removeAttribute('cv-else');
+            }
         }
 
         // cv-show — supports optional transition via cv-show-transition, :transition, or cv-transition[:[enter|leave]*]
@@ -1374,7 +1393,10 @@ export async function walk(el: Node, state: any, context: WalkContext) {
                 return p || '/';
             };
             const getCurrentPath = () => context.router?.mode === 'history'
-                ? stripBaseLocal(window.location.pathname)
+                ? (() => {
+                    const p = stripBaseLocal(window.location.pathname);
+                    return p && p.startsWith('/') ? p : '/';
+                })()
                 : window.location.hash.slice(1) || '/';
             const updateActive = () => {
                 const to = getTo();

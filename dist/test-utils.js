@@ -759,6 +759,10 @@ async function walk(el, state, context) {
           j++;
           continue;
         }
+        if (sib.nodeType === 8) {
+          j++;
+          continue;
+        }
         if (sib.nodeType !== 1) break;
         const sibEl = sib;
         if (sibEl.hasAttribute("cv-else-if")) {
@@ -829,6 +833,16 @@ async function walk(el, state, context) {
       });
       await render();
       continue;
+    }
+    if (element.hasAttribute("cv-else-if") || element.hasAttribute("cv-else")) {
+      if (element.hasAttribute("cv-else-if")) {
+        console.warn("[courvux] cv-else-if has no adjacent cv-if/cv-else-if and will be treated as a normal element.");
+        element.removeAttribute("cv-else-if");
+      }
+      if (element.hasAttribute("cv-else")) {
+        console.warn("[courvux] cv-else has no adjacent cv-if/cv-else-if and will be treated as a normal element.");
+        element.removeAttribute("cv-else");
+      }
     }
     if (element.hasAttribute("cv-show")) {
       const expr = element.getAttribute("cv-show");
@@ -1291,7 +1305,10 @@ async function walk(el, state, context) {
         if (p.startsWith(routerBase + "/")) return p.slice(routerBase.length) || "/";
         return p || "/";
       };
-      const getCurrentPath = () => context.router?.mode === "history" ? stripBaseLocal(window.location.pathname) : window.location.hash.slice(1) || "/";
+      const getCurrentPath = () => context.router?.mode === "history" ? (() => {
+        const p = stripBaseLocal(window.location.pathname);
+        return p && p.startsWith("/") ? p : "/";
+      })() : window.location.hash.slice(1) || "/";
       const updateActive = () => {
         const to = getTo();
         const isActive = getCurrentPath() === to;
@@ -1649,8 +1666,13 @@ function parseQuery(search) {
 function setupRouterView(el, router, mount3, name = "default", onFirstRender) {
   const base = router.base ?? "";
   const normalizePath = (p) => p.length > 1 && p.endsWith("/") ? p.slice(0, -1) : p;
+  const normalizeHistoryPath = (pathname) => {
+    const stripped = normalizePath(stripBase(pathname, base));
+    if (!stripped || !stripped.startsWith("/")) return "/";
+    return stripped;
+  };
   const getCurrentPath = () => {
-    if (router.mode === "history") return normalizePath(stripBase(window.location.pathname, base));
+    if (router.mode === "history") return normalizeHistoryPath(window.location.pathname);
     const hash = window.location.hash.slice(1) || "/";
     return normalizePath(hash.split("?")[0] || "/");
   };
@@ -2806,8 +2828,15 @@ function createApp(config) {
       mountRegistry.clear();
     }
   };
+  const resolveBaseUrl = () => {
+    try {
+      return new URL(".", document.baseURI).href;
+    } catch {
+      return void 0;
+    }
+  };
   const _mountEl = async (root) => {
-    const baseUrl = new URL(".", document.baseURI).href;
+    const baseUrl = resolveBaseUrl();
     const appContext = {
       components: globalComponents,
       router: config.router,
