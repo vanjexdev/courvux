@@ -1,0 +1,1 @@
+/home/jesusu/Workspace/vanjexdev/node/courvux/skills/courvux/SKILL.md
