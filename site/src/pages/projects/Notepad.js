@@ -156,7 +156,7 @@ fn main() { println!("hello tauri"); }
                     <tr><th>Layer</th><th>Pick</th><th>Why</th></tr>
                 </thead>
                 <tbody>
-                    <tr><td>UI runtime</td><td>Courvux 7.1.1</td><td>~22 KB gzip everything-included; supports the strict-CSP precompile path</td></tr>
+                    <tr><td>UI runtime</td><td>Courvux 0.7.2</td><td>~22 KB gzip everything-included; supports the strict-CSP precompile path</td></tr>
                     <tr><td>Build / bundler</td><td>Vite 6</td><td>Plugin ecosystem (tailwind, courvux-precompile), instant HMR</td></tr>
                     <tr><td>Styling</td><td>Tailwind 4</td><td>No config file, single <code>@import</code></td></tr>
                     <tr><td>Markdown</td><td>marked + DOMPurify</td><td>Fast parser; mandatory sanitization for hostile pastes</td></tr>

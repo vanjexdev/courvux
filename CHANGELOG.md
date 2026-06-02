@@ -5,7 +5,7 @@ Format: `[version] — date — description`
 
 ---
 
-## [7.1.1] — 2026-06-02
+## [0.7.2] — 2026-06-02
 
 Patch — fixes iframe mounting edge cases and tightens `cv-else` chain
 handling.
